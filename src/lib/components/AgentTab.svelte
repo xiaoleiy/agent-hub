@@ -4,28 +4,23 @@
   let { agent } = $props();
 
   let sessions = $state(/** @type {any[]} */ ([]));
-  let usage5h = $state(/** @type {any} */ (null));
-  let usage1w = $state(/** @type {any} */ (null));
+  let richUsage = $state(/** @type {any} */ (null));
 
   async function fetchData() {
+    const name = agent.name === "Claude Code" ? "claude" : agent.name.toLowerCase();
     try {
-      const name = agent.name === "Claude Code" ? "claude" : agent.name.toLowerCase();
       sessions = await invoke("get_agent_sessions", { agent: name });
     } catch (_) {
       sessions = [];
     }
     try {
-      const name = agent.name === "Claude Code" ? "claude" : agent.name.toLowerCase();
-      usage5h = await invoke("get_agent_usage", { agent: name, window: "5h" });
-      usage1w = await invoke("get_agent_usage", { agent: name, window: "1w" });
+      richUsage = await invoke("get_agent_rich_usage", { agent: name });
     } catch (_) {
-      usage5h = null;
-      usage1w = null;
+      richUsage = null;
     }
   }
 
   $effect(() => {
-    // Re-fetch when agent changes
     const _ = agent;
     fetchData();
   });
@@ -49,6 +44,28 @@
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
+  }
+
+  /** @param {number} n */
+  function fmtTokens(n) {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return n.toLocaleString();
+  }
+
+  /** @param {number} percent */
+  function usageBarColor(percent) {
+    if (percent >= 90) return "#ef4444";
+    if (percent >= 70) return "#eab308";
+    return "#22c55e";
+  }
+
+  /** @param {number} mins */
+  function formatWindow(mins) {
+    if (mins >= 10080) return `${Math.round(mins / 10080)}w`;
+    if (mins >= 1440) return `${Math.round(mins / 1440)}d`;
+    if (mins >= 60) return `${Math.round(mins / 60)}h`;
+    return `${mins}m`;
   }
 </script>
 
@@ -82,30 +99,116 @@
     </div>
   </div>
 
-  <!-- Usage Section -->
-  <div class="usage-section">
-    <h3>Usage</h3>
-    <div class="usage-grid">
-      <div class="usage-card">
-        <div class="usage-label">Per 5 Hours</div>
-        {#if usage5h}
-          <div class="usage-value">{usage5h.total_interactions.toLocaleString()}</div>
-          <div class="usage-detail">{usage5h.total_sessions} sessions</div>
-        {:else}
-          <div class="usage-value dim">—</div>
+  <!-- Rate Limit Windows -->
+  {#if richUsage?.session_window || richUsage?.weekly_window}
+    <div class="rate-limits">
+      <h3>Rate Limits</h3>
+      <div class="rate-grid">
+        {#if richUsage.session_window}
+          {@const w = richUsage.session_window}
+          <div class="rate-card">
+            <div class="rate-header">
+              <span class="rate-label">Session ({formatWindow(w.window_minutes)})</span>
+              <span class="rate-percent" style="color: {usageBarColor(w.used_percent)}">
+                {w.used_percent.toFixed(1)}% used
+              </span>
+            </div>
+            <div class="rate-bar-track">
+              <div
+                class="rate-bar-fill"
+                style="width: {Math.min(w.used_percent, 100)}%; background: {usageBarColor(w.used_percent)}"
+              ></div>
+            </div>
+            {#if w.resets_at}
+              <div class="rate-reset">resets {relativeTime(w.resets_at)}</div>
+            {/if}
+          </div>
         {/if}
-      </div>
-      <div class="usage-card">
-        <div class="usage-label">Per 1 Week</div>
-        {#if usage1w}
-          <div class="usage-value">{usage1w.total_interactions.toLocaleString()}</div>
-          <div class="usage-detail">{usage1w.total_sessions} sessions</div>
-        {:else}
-          <div class="usage-value dim">—</div>
+        {#if richUsage.weekly_window}
+          {@const w = richUsage.weekly_window}
+          <div class="rate-card">
+            <div class="rate-header">
+              <span class="rate-label">Weekly ({formatWindow(w.window_minutes)})</span>
+              <span class="rate-percent" style="color: {usageBarColor(w.used_percent)}">
+                {w.used_percent.toFixed(1)}% used
+              </span>
+            </div>
+            <div class="rate-bar-track">
+              <div
+                class="rate-bar-fill"
+                style="width: {Math.min(w.used_percent, 100)}%; background: {usageBarColor(w.used_percent)}"
+              ></div>
+            </div>
+            {#if w.resets_at}
+              <div class="rate-reset">resets {relativeTime(w.resets_at)}</div>
+            {/if}
+          </div>
         {/if}
       </div>
     </div>
-  </div>
+  {/if}
+
+  <!-- Token Usage -->
+  {#if richUsage?.tokens}
+    {@const t = richUsage.tokens}
+    <div class="tokens-section">
+      <h3>Token Usage</h3>
+      <div class="token-grid">
+        <div class="token-card">
+          <div class="token-label">Input</div>
+          <div class="token-value">{fmtTokens(t.input_tokens)}</div>
+        </div>
+        <div class="token-card">
+          <div class="token-label">Cache Read</div>
+          <div class="token-value cache">{fmtTokens(t.cache_read_tokens)}</div>
+        </div>
+        <div class="token-card">
+          <div class="token-label">Cache Create</div>
+          <div class="token-value cache">{fmtTokens(t.cache_create_tokens)}</div>
+        </div>
+        <div class="token-card">
+          <div class="token-label">Output</div>
+          <div class="token-value">{fmtTokens(t.output_tokens)}</div>
+        </div>
+        <div class="token-card total">
+          <div class="token-label">Total</div>
+          <div class="token-value">{fmtTokens(t.total_tokens)}</div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Model Breakdowns -->
+  {#if richUsage?.model_breakdowns?.length > 0}
+    <div class="models-section">
+      <h3>Models</h3>
+      <div class="model-list">
+        {#each richUsage.model_breakdowns as m}
+          <div class="model-row">
+            <span class="model-name">{m.model}</span>
+            <span class="model-tokens">{fmtTokens(m.total_tokens)} tokens</span>
+            <span class="model-requests">{m.request_count} reqs</span>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Summary Stats -->
+  {#if richUsage && !richUsage.tokens && !richUsage.session_window}
+    <div class="summary-section">
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-label">Total Interactions</div>
+          <div class="summary-value">{richUsage.total_interactions.toLocaleString()}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total Sessions</div>
+          <div class="summary-value">{richUsage.total_sessions}</div>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <!-- Sessions Section -->
   <div class="sessions-section">
@@ -192,9 +295,7 @@
     flex-shrink: 0;
   }
 
-  .dot.running {
-    background: #22c55e;
-  }
+  .dot.running { background: #22c55e; }
 
   .name {
     font-weight: 700;
@@ -211,20 +312,10 @@
     font-family: "SF Mono", "Fira Code", monospace;
   }
 
-  .ver-badge.cli {
-    background: #0ea5e920;
-    color: #0ea5e9;
-  }
+  .ver-badge.cli { background: #0ea5e920; color: #0ea5e9; }
+  .ver-badge.gui { background: #a855f720; color: #a855f7; }
 
-  .ver-badge.gui {
-    background: #a855f720;
-    color: #a855f7;
-  }
-
-  .session-summary {
-    display: flex;
-    gap: 6px;
-  }
+  .session-summary { display: flex; gap: 6px; }
 
   .badge {
     display: inline-block;
@@ -234,82 +325,196 @@
     font-weight: 500;
   }
 
-  .badge.active {
-    background: #22c55e20;
-    color: #22c55e;
-  }
+  .badge.active { background: #22c55e20; color: #22c55e; }
+  .badge.cli { background: #0ea5e920; color: #0ea5e9; }
+  .badge.gui { background: #a855f720; color: #a855f7; }
+  .badge.idle { background: #eab30820; color: #eab308; }
+  .badge.missing { background: #333; color: #666; }
 
-  .badge.cli {
-    background: #0ea5e920;
-    color: #0ea5e9;
-  }
-
-  .badge.gui {
-    background: #a855f720;
-    color: #a855f7;
-  }
-
-  .badge.idle {
-    background: #eab30820;
-    color: #eab308;
-  }
-
-  .badge.missing {
-    background: #333;
-    color: #666;
-  }
-
-  .usage-section h3,
-  .sessions-section h3 {
+  h3 {
     font-size: 0.95rem;
     font-weight: 600;
     color: #fff;
     margin-bottom: 10px;
   }
 
-  .usage-grid {
+  /* Rate Limits */
+  .rate-limits {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .rate-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
 
-  .usage-card {
+  .rate-card {
+    background: #222;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .rate-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .rate-label {
+    font-size: 0.8rem;
+    color: #888;
+  }
+
+  .rate-percent {
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rate-bar-track {
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .rate-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  .rate-reset {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  /* Tokens */
+  .tokens-section {
     background: #1a1a1a;
     border: 1px solid #2a2a2a;
     border-radius: 10px;
     padding: 16px;
+  }
+
+  .token-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+
+  .token-card {
+    background: #222;
+    border-radius: 8px;
+    padding: 10px;
     text-align: center;
   }
 
-  .usage-label {
-    font-size: 0.75rem;
+  .token-card.total {
+    background: #2563eb20;
+    border: 1px solid #2563eb40;
+  }
+
+  .token-label {
+    font-size: 0.65rem;
     color: #888;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
-  .usage-value {
-    font-size: 1.6rem;
+  .token-value {
+    font-size: 1.1rem;
     font-weight: 700;
     color: #fff;
     font-variant-numeric: tabular-nums;
   }
 
-  .usage-value.dim {
-    color: #444;
-    font-size: 1.2rem;
+  .token-value.cache {
+    color: #0ea5e9;
   }
 
-  .usage-detail {
+  /* Models */
+  .models-section {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .model-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px;
+    background: #222;
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+
+  .model-name {
+    flex: 1;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.8rem;
+    color: #fff;
+  }
+
+  .model-tokens {
+    color: #0ea5e9;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .model-requests {
+    color: #888;
+    font-size: 0.75rem;
+  }
+
+  /* Summary */
+  .summary-section {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .summary-card {
+    text-align: center;
+  }
+
+  .summary-label {
     font-size: 0.75rem;
     color: #888;
-    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
   }
 
-  .sessions-section {
-    overflow-x: auto;
+  .summary-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
   }
+
+  /* Sessions */
+  .sessions-section { overflow-x: auto; }
 
   table {
     width: 100%;
@@ -348,15 +553,8 @@
     font-weight: 500;
   }
 
-  .status-badge.busy {
-    background: #ef444420;
-    color: #ef4444;
-  }
-
-  .status-badge.idle {
-    background: #22c55e20;
-    color: #22c55e;
-  }
+  .status-badge.busy { background: #ef444420; color: #ef4444; }
+  .status-badge.idle { background: #22c55e20; color: #22c55e; }
 
   .mode-badge {
     display: inline-block;
@@ -368,15 +566,8 @@
     color: #888;
   }
 
-  .mode-badge.cli {
-    background: #0ea5e920;
-    color: #0ea5e9;
-  }
-
-  .mode-badge.gui {
-    background: #a855f720;
-    color: #a855f7;
-  }
+  .mode-badge.cli { background: #0ea5e920; color: #0ea5e9; }
+  .mode-badge.gui { background: #a855f720; color: #a855f7; }
 
   .workdir {
     max-width: 150px;
@@ -385,19 +576,7 @@
     text-overflow: ellipsis;
   }
 
-  .time {
-    color: #888;
-    font-size: 0.8rem;
-  }
-
-  .dim {
-    color: #555;
-  }
-
-  .empty {
-    color: #666;
-    font-size: 0.9rem;
-    text-align: center;
-    padding: 20px;
-  }
+  .time { color: #888; font-size: 0.8rem; }
+  .dim { color: #555; }
+  .empty { color: #666; font-size: 0.9rem; text-align: center; padding: 20px; }
 </style>

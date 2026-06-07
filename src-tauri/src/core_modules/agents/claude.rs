@@ -1,6 +1,7 @@
-use crate::models::types::{AgentInfo, AgentType, Session, UsageStats};
+use crate::models::types::{AgentInfo, AgentType, AgentUsage, ModelUsage, Session, TokenUsage, UsageStats};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -228,6 +229,151 @@ fn parse_window(window: &str) -> chrono::Duration {
         "1w" => chrono::Duration::weeks(1),
         "1m" => chrono::Duration::days(30),
         _ => chrono::Duration::hours(5),
+    }
+}
+
+/// Get rich usage data by parsing Claude JSONL files for token breakdowns
+pub fn get_rich_usage() -> AgentUsage {
+    let history_path = claude_dir().join("history.jsonl");
+    let projects_dir = claude_dir().join("projects");
+
+    // Count interactions from history.jsonl
+    let mut total_interactions = 0usize;
+    let mut sessions_set = std::collections::HashSet::new();
+    if let Ok(content) = fs::read_to_string(&history_path) {
+        for line in content.lines() {
+            if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
+                total_interactions += 1;
+                sessions_set.insert(entry.session_id.clone());
+            }
+        }
+    }
+
+    // Parse JSONL files in projects/ for token data
+    let mut tokens = TokenUsage {
+        input_tokens: 0,
+        cache_read_tokens: 0,
+        cache_create_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+    };
+    let mut model_map: HashMap<String, (u64, u64, usize)> = HashMap::new(); // (input, output, count)
+
+    if projects_dir.exists() {
+        collect_jsonl_tokens(&projects_dir, &mut tokens, &mut model_map);
+    }
+
+    let model_breakdowns: Vec<ModelUsage> = model_map
+        .into_iter()
+        .map(|(model, (inp, out, count))| ModelUsage {
+            model,
+            input_tokens: inp,
+            output_tokens: out,
+            total_tokens: inp + out,
+            request_count: count,
+        })
+        .collect();
+
+    let has_tokens = tokens.total_tokens > 0;
+
+    AgentUsage {
+        agent: "Claude Code".to_string(),
+        session_window: None, // Would need OAuth API call
+        weekly_window: None,
+        tokens: if has_tokens { Some(tokens) } else { None },
+        model_breakdowns,
+        total_interactions,
+        total_sessions: sessions_set.len(),
+    }
+}
+
+/// Recursively scan JSONL files under a directory for token usage data
+fn collect_jsonl_tokens(
+    dir: &PathBuf,
+    tokens: &mut TokenUsage,
+    model_map: &mut HashMap<String, (u64, u64, usize)>,
+) {
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_jsonl_tokens(&path, tokens, model_map);
+        } else if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
+            parse_claude_jsonl(&path, tokens, model_map);
+        }
+    }
+}
+
+/// Parse a single Claude JSONL file for token usage from assistant messages
+fn parse_claude_jsonl(
+    path: &PathBuf,
+    tokens: &mut TokenUsage,
+    model_map: &mut HashMap<String, (u64, u64, usize)>,
+) {
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    for line in content.lines() {
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        // Only process "assistant" type messages with usage data
+        if v.get("type").and_then(|t| t.as_str()) != Some("assistant") {
+            continue;
+        }
+
+        let usage = match v.pointer("/message/usage") {
+            Some(u) => u,
+            None => continue,
+        };
+
+        let model = v
+            .pointer("/message/model")
+            .and_then(|m| m.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let inp = usage
+            .get("input_tokens")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let cache_read = usage
+            .get("cache_read_input_tokens")
+            .or_else(|| usage.get("cache_read_tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let cache_create = usage
+            .get("cache_creation_input_tokens")
+            .or_else(|| usage.get("cache_creation_tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let out = usage
+            .get("output_tokens")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+
+        if inp + cache_read + cache_create + out == 0 {
+            continue;
+        }
+
+        tokens.input_tokens += inp;
+        tokens.cache_read_tokens += cache_read;
+        tokens.cache_create_tokens += cache_create;
+        tokens.output_tokens += out;
+        tokens.total_tokens += inp + cache_read + cache_create + out;
+
+        let entry = model_map.entry(model).or_insert((0, 0, 0));
+        entry.0 += inp + cache_read + cache_create;
+        entry.1 += out;
+        entry.2 += 1;
     }
 }
 

@@ -68,6 +68,7 @@ pub fn run() {
             commands::agents::get_agents,
             commands::agents::get_agent_sessions,
             commands::agents::get_agent_usage,
+            commands::agents::get_agent_rich_usage,
             commands::proxy::get_proxy_info,
             commands::keepalive::get_keepalive_status,
             commands::keepalive::set_keepalive,

@@ -1,5 +1,5 @@
 use crate::core_modules::{agents, keepalive, network, proxy, system};
-use crate::models::types::{AgentInfo, KeepAliveStatus, NetworkInfo, ProxyInfo, Session, SystemStatus, UsageStats};
+use crate::models::types::{AgentInfo, AgentUsage, KeepAliveStatus, NetworkInfo, ProxyInfo, Session, SystemStatus, UsageStats};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
     execute,
@@ -34,6 +34,7 @@ struct App {
     /// Usage stats per agent
     agent_usage_5h: Vec<UsageStats>,
     agent_usage_1w: Vec<UsageStats>,
+    agent_rich_usage: Vec<AgentUsage>,
     proxy: ProxyInfo,
     keepalive: KeepAliveStatus,
     active_tab: usize,
@@ -52,6 +53,7 @@ impl App {
             agent_sessions: vec![Vec::new(); agent_count],
             agent_usage_5h: Vec::new(),
             agent_usage_1w: Vec::new(),
+            agent_rich_usage: Vec::new(),
             proxy: proxy::get_proxy_info(),
             keepalive: keepalive::get_keepalive_status(),
             active_tab: 0,
@@ -116,6 +118,13 @@ impl App {
             .agents
             .iter()
             .map(|a| agents::get_usage(&a.agent_type, "1w"))
+            .collect();
+
+        // Rich usage with token breakdowns and rate limits
+        self.agent_rich_usage = self
+            .agents
+            .iter()
+            .map(|a| agents::get_rich_usage(&a.agent_type))
             .collect();
 
         // Clamp active_tab to valid range after agents list may have changed
@@ -329,9 +338,8 @@ fn draw(f: &mut Frame, app: &mut App) {
             let agent = installed[agent_idx];
             if let Some(all_idx) = app.agents.iter().position(|a| a.agent_type == agent.agent_type) {
                 let sessions = app.agent_sessions.get(all_idx).cloned().unwrap_or_default();
-                let usage_5h = app.agent_usage_5h.get(all_idx).cloned();
-                let usage_1w = app.agent_usage_1w.get(all_idx).cloned();
-                draw_agent_tab(f, agent, &sessions, usage_5h.as_ref(), usage_1w.as_ref(), chunks[1]);
+                let rich = app.agent_rich_usage.get(all_idx).cloned();
+                draw_agent_tab(f, agent, &sessions, rich.as_ref(), chunks[1]);
             }
         }
     }
@@ -612,27 +620,57 @@ fn draw_agent_tab(
     f: &mut Frame,
     agent: &AgentInfo,
     sessions: &[Session],
-    usage_5h: Option<&UsageStats>,
-    usage_1w: Option<&UsageStats>,
+    rich_usage: Option<&AgentUsage>,
     area: Rect,
 ) {
+    // Determine layout based on available data
+    let has_rate_limits = rich_usage
+        .as_ref()
+        .map(|u| u.session_window.is_some() || u.weekly_window.is_some())
+        .unwrap_or(false);
+    let has_tokens = rich_usage
+        .as_ref()
+        .map(|u| u.tokens.is_some())
+        .unwrap_or(false);
+
+    let header_height = 5;
+    let rate_height = if has_rate_limits { 5 } else { 0 };
+    let token_height = if has_tokens { 5 } else { 0 };
+
+    let mut constraints = vec![Constraint::Length(header_height)];
+    if has_rate_limits {
+        constraints.push(Constraint::Length(rate_height));
+    }
+    if has_tokens {
+        constraints.push(Constraint::Length(token_height));
+    }
+    constraints.push(Constraint::Min(6)); // sessions
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(5), // agent header
-            Constraint::Length(5), // usage row
-            Constraint::Min(6),   // sessions
-        ])
+        .constraints(constraints)
         .split(area);
 
-    // ── Agent Header ──
-    draw_agent_header(f, agent, chunks[0]);
+    let mut idx = 0;
 
-    // ── Usage: 5h + 1w side by side ──
-    draw_agent_usage_row(f, usage_5h, usage_1w, chunks[1]);
+    // ── Agent Header ──
+    draw_agent_header(f, agent, chunks[idx]);
+    idx += 1;
+
+    // ── Rate Limits ──
+    if has_rate_limits {
+        draw_rate_limits(f, rich_usage.unwrap(), chunks[idx]);
+        idx += 1;
+    }
+
+    // ── Token Usage ──
+    if has_tokens {
+        draw_token_usage(f, rich_usage.unwrap(), chunks[idx]);
+        idx += 1;
+    }
 
     // ── Sessions table ──
-    draw_agent_sessions(f, agent, sessions, chunks[2]);
+    draw_agent_sessions(f, agent, sessions, chunks[idx]);
 }
 
 fn draw_agent_header(f: &mut Frame, agent: &AgentInfo, area: Rect) {
@@ -680,51 +718,138 @@ fn draw_agent_header(f: &mut Frame, agent: &AgentInfo, area: Rect) {
     f.render_widget(p, inner);
 }
 
-fn draw_agent_usage_row(
-    f: &mut Frame,
-    usage_5h: Option<&UsageStats>,
-    usage_1w: Option<&UsageStats>,
-    area: Rect,
-) {
-    let columns = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(area);
-
-    draw_usage_card(f, "5 Hours", usage_5h, columns[0]);
-    draw_usage_card(f, "1 Week", usage_1w, columns[1]);
-}
-
-fn draw_usage_card(f: &mut Frame, label: &str, usage: Option<&UsageStats>, area: Rect) {
+fn draw_rate_limits(f: &mut Frame, usage: &AgentUsage, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" Usage ({}) ", label));
+        .title(" Rate Limits ");
 
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    if let Some(u) = usage {
-        let lines = vec![
-            Line::from(vec![
-                Span::raw(" Interactions: "),
-                Span::styled(
-                    format_number(u.total_interactions),
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-                ),
-            ]),
-            Line::from(vec![
-                Span::raw(" Sessions:     "),
-                Span::styled(
-                    u.total_sessions.to_string(),
-                    Style::default().fg(Color::Cyan),
-                ),
-            ]),
-        ];
-        let p = Paragraph::new(lines);
-        f.render_widget(p, inner);
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(inner);
+
+    // Session window
+    if let Some(ref w) = usage.session_window {
+        draw_rate_bar(f, "Session", w.used_percent, w.window_minutes, columns[0]);
+    }
+
+    // Weekly window
+    if let Some(ref w) = usage.weekly_window {
+        draw_rate_bar(f, "Weekly", w.used_percent, w.window_minutes, columns[1]);
+    }
+}
+
+fn draw_rate_bar(f: &mut Frame, label: &str, used_pct: f64, window_mins: u64, area: Rect) {
+    let color = if used_pct >= 90.0 {
+        Color::Red
+    } else if used_pct >= 70.0 {
+        Color::Yellow
     } else {
-        let p = Paragraph::new(" No data").style(Style::default().fg(Color::DarkGray));
-        f.render_widget(p, inner);
+        Color::Green
+    };
+
+    let window_str = if window_mins >= 10080 {
+        format!("{}w", window_mins / 10080)
+    } else if window_mins >= 1440 {
+        format!("{}d", window_mins / 1440)
+    } else if window_mins >= 60 {
+        format!("{}h", window_mins / 60)
+    } else {
+        format!("{}m", window_mins)
+    };
+
+    let lines = vec![
+        Line::from(vec![
+            Span::styled(
+                format!(" {} ({})", label, window_str),
+                Style::default().fg(Color::Gray),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                format!("{:.1}%", used_pct),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(Span::styled(
+            format_bar(used_pct, area.width.saturating_sub(2) as usize),
+            Style::default().fg(color),
+        )),
+    ];
+
+    let p = Paragraph::new(lines);
+    f.render_widget(p, area);
+}
+
+fn draw_token_usage(f: &mut Frame, usage: &AgentUsage, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Tokens ");
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let tokens = match usage.tokens {
+        Some(ref t) => t,
+        None => {
+            f.render_widget(
+                Paragraph::new(" No token data").style(Style::default().fg(Color::DarkGray)),
+                inner,
+            );
+            return;
+        }
+    };
+
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(20),
+            Constraint::Percentage(20),
+            Constraint::Percentage(20),
+            Constraint::Percentage(20),
+            Constraint::Percentage(20),
+        ])
+        .split(inner);
+
+    let items = [
+        ("Input", tokens.input_tokens, Color::White),
+        ("Cache R", tokens.cache_read_tokens, Color::Cyan),
+        ("Cache W", tokens.cache_create_tokens, Color::Cyan),
+        ("Output", tokens.output_tokens, Color::Green),
+        ("Total", tokens.total_tokens, Color::Yellow),
+    ];
+
+    for (i, (label, value, color)) in items.iter().enumerate() {
+        let lines = vec![
+            Line::from(Span::styled(
+                *label,
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(Span::styled(
+                format_tokens(*value),
+                Style::default().fg(*color).add_modifier(Modifier::BOLD),
+            )),
+        ];
+        f.render_widget(Paragraph::new(lines), columns[i]);
+    }
+}
+
+fn format_bar(pct: f64, width: usize) -> String {
+    let filled = ((pct / 100.0) * width as f64).round() as usize;
+    let filled = filled.min(width);
+    let empty = width.saturating_sub(filled);
+    format!("{}{}", "█".repeat(filled), "░".repeat(empty))
+}
+
+fn format_tokens(n: u64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{:.1}k", n as f64 / 1_000.0)
+    } else {
+        n.to_string()
     }
 }
 
@@ -1267,18 +1392,6 @@ fn format_rate(bytes_per_sec: f64) -> String {
     } else {
         format!("{:.0} B/s", bytes_per_sec)
     }
-}
-
-fn format_number(n: usize) -> String {
-    let s = n.to_string();
-    let mut result = String::new();
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            result.push(',');
-        }
-        result.push(c);
-    }
-    result.chars().rev().collect()
 }
 
 fn relative_time(iso: &str) -> String {

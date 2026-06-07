@@ -72,7 +72,7 @@ pub struct Session {
     pub entrypoint: String,
 }
 
-/// Usage statistics for an agent
+/// Usage statistics for an agent (legacy simple format)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageStats {
     pub agent: String,
@@ -81,6 +81,55 @@ pub struct UsageStats {
     pub total_interactions: usize,
     pub first_activity: Option<String>,
     pub last_activity: Option<String>,
+}
+
+/// Rich usage data matching codexbar's data model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentUsage {
+    pub agent: String,
+    /// 5-hour session rate limit window
+    pub session_window: Option<RateWindow>,
+    /// Weekly rate limit window
+    pub weekly_window: Option<RateWindow>,
+    /// Token breakdown from local JSONL parsing
+    pub tokens: Option<TokenUsage>,
+    /// Per-model token breakdown
+    pub model_breakdowns: Vec<ModelUsage>,
+    /// Total interactions counted from history
+    pub total_interactions: usize,
+    /// Number of sessions
+    pub total_sessions: usize,
+}
+
+/// A rate-limit window (like codexbar's RateWindow)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateWindow {
+    /// Percent used (0-100)
+    pub used_percent: f64,
+    /// Window duration in minutes (e.g. 300 for 5h, 10080 for weekly)
+    pub window_minutes: u64,
+    /// When the window resets (ISO 8601)
+    pub resets_at: Option<String>,
+}
+
+/// Token usage breakdown
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenUsage {
+    pub input_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_create_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+}
+
+/// Per-model usage breakdown
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelUsage {
+    pub model: String,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+    pub request_count: usize,
 }
 
 /// Keep-alive status

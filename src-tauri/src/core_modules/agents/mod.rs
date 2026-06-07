@@ -2,7 +2,7 @@ pub mod claude;
 pub mod codex;
 pub mod cursor;
 
-use crate::models::types::{AgentInfo, AgentType, Session, UsageStats};
+use crate::models::types::{AgentInfo, AgentType, AgentUsage, Session, UsageStats};
 
 /// Detect all agents and return their info
 pub fn detect_all_agents() -> Vec<AgentInfo> {
@@ -28,5 +28,14 @@ pub fn get_usage(agent_type: &AgentType, window: &str) -> UsageStats {
         AgentType::ClaudeCode => claude::get_usage(window),
         AgentType::Cursor => cursor::get_usage(window),
         AgentType::Codex => codex::get_usage(window),
+    }
+}
+
+/// Get rich usage data with token breakdowns and rate limits
+pub fn get_rich_usage(agent_type: &AgentType) -> AgentUsage {
+    match agent_type {
+        AgentType::ClaudeCode => claude::get_rich_usage(),
+        AgentType::Cursor => cursor::get_rich_usage(),
+        AgentType::Codex => codex::get_rich_usage(),
     }
 }

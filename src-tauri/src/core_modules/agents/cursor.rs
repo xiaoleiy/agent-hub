@@ -1,4 +1,4 @@
-use crate::models::types::{AgentInfo, AgentType, Session, UsageStats};
+use crate::models::types::{AgentInfo, AgentType, AgentUsage, Session, UsageStats};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use std::path::PathBuf;
@@ -227,6 +227,47 @@ fn window_seconds(window: &str) -> u64 {
         "1w" => 7 * 86400,
         "1m" => 30 * 86400,
         _ => 5 * 3600,
+    }
+}
+
+/// Get rich usage data for Cursor (API-based, no local JSONL)
+pub fn get_rich_usage() -> AgentUsage {
+    // Cursor doesn't have local JSONL files for token data.
+    // Rate limit info would require web API calls with cookies.
+    // Return basic session count from the tracking DB.
+    let db_path = tracking_db_path();
+    let mut total_sessions = 0usize;
+    let mut total_interactions = 0usize;
+
+    if db_path.exists() {
+        if let Ok(conn) = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+            // Count distinct conversations
+            if let Ok(count) = conn.query_row(
+                "SELECT COUNT(DISTINCT conversationId) FROM conversation_summaries",
+                [],
+                |row| row.get::<_, usize>(0),
+            ) {
+                total_sessions = count;
+            }
+            // Count total interactions from ai_code_hashes
+            if let Ok(count) = conn.query_row(
+                "SELECT COUNT(*) FROM ai_code_hashes",
+                [],
+                |row| row.get::<_, usize>(0),
+            ) {
+                total_interactions = count;
+            }
+        }
+    }
+
+    AgentUsage {
+        agent: "Cursor".to_string(),
+        session_window: None,
+        weekly_window: None,
+        tokens: None,
+        model_breakdowns: vec![],
+        total_interactions,
+        total_sessions,
     }
 }
 

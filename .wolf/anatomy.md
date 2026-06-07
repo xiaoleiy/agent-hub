@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-07T15:20:13.167Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-07T15:45:52.887Z
 > Files: 113 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -175,7 +175,7 @@
 
 ## src-tauri/src/
 
-- `lib.rs` — Entry point: routes to CLI mode or GUI mode based on arguments. (~841 tok)
+- `lib.rs` — Entry point: routes to CLI mode or GUI mode based on arguments. (~799 tok)
 - `main.rs` — Prevents additional console window on Windows in release, DO NOT REMOVE!! (~53 tok)
 
 ## src-tauri/src/cli/
@@ -185,7 +185,7 @@
 
 ## src-tauri/src/commands/
 
-- `agents.rs` — [tauri::command] (~349 tok)
+- `agents.rs` — [tauri::command] (~500 tok)
 - `keepalive.rs` — [tauri::command] (~116 tok)
 - `mod.rs` (~24 tok)
 - `network.rs` — [tauri::command] (~70 tok)
@@ -202,19 +202,19 @@
 
 ## src-tauri/src/core_modules/agents/
 
-- `claude.rs` — Detect Claude Code installation and running state (~2832 tok)
-- `codex.rs` — detect, get_sessions, get_usage (~3160 tok)
-- `cursor.rs` — Detect Cursor installation and running state (~2788 tok)
-- `mod.rs` — Detect all agents and return their info (~267 tok)
+- `claude.rs` — Detect Claude Code installation and running state (~3870 tok)
+- `codex.rs` — detect, get_sessions, get_usage, get_rich_usage (~4541 tok)
+- `cursor.rs` — Detect Cursor installation and running state (~2978 tok)
+- `mod.rs` — Detect all agents and return their info (~339 tok)
 
 ## src-tauri/src/models/
 
 - `mod.rs` (~5 tok)
-- `types.rs` — System status information (~1117 tok)
+- `types.rs` — System status information (~1439 tok)
 
 ## src-tauri/src/tui/
 
-- `mod.rs` — run_tui (~12742 tok)
+- `mod.rs` — run_tui (~12756 tok)
 
 ## src/
 
@@ -223,7 +223,7 @@
 ## src/lib/components/
 
 - `AgentCard.svelte` — Svelte: AgentCard, 4 stores (~893 tok)
-- `AgentTab.svelte` — Svelte: AgentTab, 5 stores (~2352 tok)
+- `AgentTab.svelte` — Svelte: AgentTab (~3836 tok)
 - `KeepAlive.svelte` — Svelte: KeepAlive, 2 stores (~955 tok)
 - `NetworkInfo.svelte` — Svelte: NetworkInfo, 1 stores (~443 tok)
 - `ProxyInfo.svelte` — Svelte: ProxyInfo, 3 stores (~3331 tok)
