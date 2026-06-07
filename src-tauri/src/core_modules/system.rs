@@ -1,20 +1,30 @@
 use crate::models::types::SystemStatus;
+use std::sync::Mutex;
+use std::time::Instant;
 use sysinfo::{Networks, System};
 
+struct NetworkSnapshot {
+    tx_bytes: u64,
+    rx_bytes: u64,
+    timestamp: Instant,
+}
+
+static PREV_NETWORK: Mutex<Option<NetworkSnapshot>> = Mutex::new(None);
+
 /// Gather current system status: CPU, RAM, uptime, network I/O, username.
+/// Network rates (upload/download) are computed as bytes/sec since the last call.
 pub fn get_system_status() -> SystemStatus {
     let mut sys = System::new_all();
-    // Need two refreshes separated by a short sleep to get CPU usage
     sys.refresh_all();
     std::thread::sleep(std::time::Duration::from_millis(200));
     sys.refresh_all();
 
-    // CPU usage (average across all cores)
+    // CPU
     let cpu_usage = sys.global_cpu_usage();
     let cpu_cores = sys.cpus().len();
 
     // RAM
-    let ram_total = sys.total_memory() as f64 / 1_073_741_824.0; // bytes → GB
+    let ram_total = sys.total_memory() as f64 / 1_073_741_824.0;
     let ram_used = sys.used_memory() as f64 / 1_073_741_824.0;
     let ram_percent = if ram_total > 0.0 {
         (ram_used / ram_total) * 100.0
@@ -38,6 +48,34 @@ pub fn get_system_status() -> SystemStatus {
         total_rx += data.total_received();
     }
 
+    // Compute upload/download rates (bytes/sec) from delta
+    let now = Instant::now();
+    let (upload_rate, download_rate) = {
+        let prev = PREV_NETWORK.lock().unwrap();
+        if let Some(ref snap) = *prev {
+            let elapsed = now.duration_since(snap.timestamp).as_secs_f64();
+            if elapsed > 0.01 {
+                let tx_delta = total_tx.saturating_sub(snap.tx_bytes);
+                let rx_delta = total_rx.saturating_sub(snap.rx_bytes);
+                (tx_delta as f64 / elapsed, rx_delta as f64 / elapsed)
+            } else {
+                (0.0, 0.0)
+            }
+        } else {
+            (0.0, 0.0)
+        }
+    };
+
+    // Store current snapshot for next call
+    {
+        let mut prev = PREV_NETWORK.lock().unwrap();
+        *prev = Some(NetworkSnapshot {
+            tx_bytes: total_tx,
+            rx_bytes: total_rx,
+            timestamp: now,
+        });
+    }
+
     SystemStatus {
         cpu_usage,
         cpu_cores,
@@ -49,8 +87,8 @@ pub fn get_system_status() -> SystemStatus {
         username,
         network_upload_bytes: total_tx,
         network_download_bytes: total_rx,
-        network_upload_rate: 0.0,  // rate computed by frontend via polling
-        network_download_rate: 0.0,
+        network_upload_rate: (upload_rate * 100.0).round() / 100.0,
+        network_download_rate: (download_rate * 100.0).round() / 100.0,
     }
 }
 

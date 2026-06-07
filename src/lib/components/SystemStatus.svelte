@@ -7,6 +7,12 @@
     if (bytes >= 1024) return (bytes / 1024).toFixed(2) + " KB";
     return bytes + " B";
   }
+
+  function formatRate(bytesPerSec) {
+    if (bytesPerSec >= 1048576) return (bytesPerSec / 1048576).toFixed(2) + " MB/s";
+    if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(2) + " KB/s";
+    return Math.round(bytesPerSec) + " B/s";
+  }
 </script>
 
 <div class="system-status">
@@ -50,13 +56,13 @@
       </div>
 
       <div class="stat">
-        <span class="label">Network TX</span>
-        <span class="value standalone">{formatBytes(status.network_upload_bytes)}</span>
+        <span class="label">Upload</span>
+        <span class="value standalone">{formatRate(status.network_upload_rate)}</span>
       </div>
 
       <div class="stat">
-        <span class="label">Network RX</span>
-        <span class="value standalone">{formatBytes(status.network_download_bytes)}</span>
+        <span class="label">Download</span>
+        <span class="value standalone">{formatRate(status.network_download_rate)}</span>
       </div>
     </div>
   {:else}

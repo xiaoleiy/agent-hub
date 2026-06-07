@@ -355,9 +355,9 @@ fn draw_system_status(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(user, rows[7]);
 
     let net = Paragraph::new(format!(
-        " Net TX: {}  RX: {}",
-        format_bytes(s.network_upload_bytes),
-        format_bytes(s.network_download_bytes)
+        " ↑ {}  ↓ {}",
+        format_rate(s.network_upload_rate),
+        format_rate(s.network_download_rate)
     ))
     .style(Style::default().fg(Color::Gray));
     f.render_widget(net, rows[8]);
@@ -740,6 +740,7 @@ fn draw_keepalive(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(table, controls_inner);
 }
 
+#[allow(dead_code)]
 fn format_bytes(bytes: u64) -> String {
     if bytes >= 1_073_741_824 {
         format!("{:.2} GB", bytes as f64 / 1_073_741_824.0)
@@ -749,6 +750,16 @@ fn format_bytes(bytes: u64) -> String {
         format!("{:.2} KB", bytes as f64 / 1024.0)
     } else {
         format!("{} B", bytes)
+    }
+}
+
+fn format_rate(bytes_per_sec: f64) -> String {
+    if bytes_per_sec >= 1_048_576.0 {
+        format!("{:.2} MB/s", bytes_per_sec / 1_048_576.0)
+    } else if bytes_per_sec >= 1024.0 {
+        format!("{:.2} KB/s", bytes_per_sec / 1024.0)
+    } else {
+        format!("{:.0} B/s", bytes_per_sec)
     }
 }
 

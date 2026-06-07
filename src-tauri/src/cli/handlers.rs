@@ -12,6 +12,9 @@ fn parse_agent(name: &str) -> Option<AgentType> {
 }
 
 pub fn status(json: bool) {
+    // First call seeds the snapshot; second call computes the rate
+    let _ = system::get_system_status();
+    std::thread::sleep(std::time::Duration::from_millis(500));
     let status = system::get_system_status();
 
     if json {
@@ -46,13 +49,13 @@ pub fn status(json: bool) {
     );
     println!(
         "  {} {}",
-        "Network TX:".dimmed(),
-        format_bytes(status.network_upload_bytes).cyan()
+        "Upload:".dimmed(),
+        format_rate(status.network_upload_rate).cyan()
     );
     println!(
         "  {} {}",
-        "Network RX:".dimmed(),
-        format_bytes(status.network_download_bytes).cyan()
+        "Download:".dimmed(),
+        format_rate(status.network_download_rate).cyan()
     );
 }
 
@@ -264,6 +267,7 @@ pub fn keepalive(mode: Option<String>, status_flag: bool) {
     }
 }
 
+#[allow(dead_code)]
 fn format_bytes(bytes: u64) -> String {
     if bytes >= 1_073_741_824 {
         format!("{:.2} GB", bytes as f64 / 1_073_741_824.0)
@@ -273,5 +277,15 @@ fn format_bytes(bytes: u64) -> String {
         format!("{:.2} KB", bytes as f64 / 1024.0)
     } else {
         format!("{} B", bytes)
+    }
+}
+
+fn format_rate(bytes_per_sec: f64) -> String {
+    if bytes_per_sec >= 1_048_576.0 {
+        format!("{:.2} MB/s", bytes_per_sec / 1_048_576.0)
+    } else if bytes_per_sec >= 1024.0 {
+        format!("{:.2} KB/s", bytes_per_sec / 1024.0)
+    } else {
+        format!("{:.0} B/s", bytes_per_sec)
     }
 }
