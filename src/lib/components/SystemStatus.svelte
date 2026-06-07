@@ -61,13 +61,8 @@
       </div>
 
       <div class="stat">
-        <span class="label">Upload</span>
-        <span class="value standalone">{formatRate(status.network_upload_rate)}</span>
-      </div>
-
-      <div class="stat">
-        <span class="label">Download</span>
-        <span class="value standalone">{formatRate(status.network_download_rate)}</span>
+        <span class="label">Traffic</span>
+        <span class="value standalone">↑ {formatRate(status.network_upload_rate)} &nbsp; ↓ {formatRate(status.network_download_rate)}</span>
       </div>
     </div>
   {:else}

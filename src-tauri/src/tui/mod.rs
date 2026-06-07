@@ -360,7 +360,7 @@ fn draw_system_status(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(host, rows[8]);
 
     let net = Paragraph::new(format!(
-        " ↑ {}  ↓ {}",
+        " Traffic:  ↑ {}  ↓ {}",
         format_rate(s.network_upload_rate),
         format_rate(s.network_download_rate)
     ))

@@ -53,13 +53,17 @@ pub fn status(json: bool) {
         status.hostname.cyan()
     );
     println!(
-        "  {} {}",
-        "Upload:".dimmed(),
+        "  {}",
+        "Traffic:".dimmed()
+    );
+    println!(
+        "    {} {}",
+        "↑ Upload:".dimmed(),
         format_rate(status.network_upload_rate).cyan()
     );
     println!(
-        "  {} {}",
-        "Download:".dimmed(),
+        "    {} {}",
+        "↓ Download:".dimmed(),
         format_rate(status.network_download_rate).cyan()
     );
 }
