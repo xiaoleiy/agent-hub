@@ -107,3 +107,52 @@ fn format_uptime(secs: u64) -> String {
         format!("{}m", minutes)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_uptime() {
+        assert_eq!(format_uptime(0), "0m");
+        assert_eq!(format_uptime(60), "1m");
+        assert_eq!(format_uptime(3600), "1h 0m");
+        assert_eq!(format_uptime(3661), "1h 1m");
+        assert_eq!(format_uptime(86400), "1d 0h 0m");
+        assert_eq!(format_uptime(90061), "1d 1h 1m");
+    }
+
+    #[test]
+    fn test_get_system_status() {
+        let status = get_system_status();
+        assert!(status.cpu_cores > 0, "should have at least 1 CPU core");
+        assert!(status.ram_total_gb > 0.0, "should have some RAM");
+        assert!(status.ram_used_gb > 0.0, "should be using some RAM");
+        assert!(status.ram_usage_percent >= 0.0 && status.ram_usage_percent <= 100.0,
+            "RAM usage should be 0-100%: {}", status.ram_usage_percent);
+        assert!(!status.username.is_empty(), "username should not be empty");
+        assert!(!status.hostname.is_empty(), "hostname should not be empty");
+        assert!(!status.uptime_formatted.is_empty(), "uptime should not be empty");
+    }
+
+    #[test]
+    fn test_system_status_rates() {
+        // First call seeds the snapshot
+        let _ = get_system_status();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        // Second call should have rates
+        let status = get_system_status();
+        // Rates should be non-negative
+        assert!(status.network_upload_rate >= 0.0, "upload rate should be >= 0");
+        assert!(status.network_download_rate >= 0.0, "download rate should be >= 0");
+    }
+
+    #[test]
+    fn test_system_status_serialization() {
+        let status = get_system_status();
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("cpu_usage"), "JSON should contain cpu_usage");
+        assert!(json.contains("hostname"), "JSON should contain hostname");
+        assert!(json.contains("username"), "JSON should contain username");
+    }
+}

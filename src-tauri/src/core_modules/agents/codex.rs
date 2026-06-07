@@ -265,3 +265,90 @@ fn window_seconds(window: &str) -> u64 {
         _ => 5 * 3600,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_codex_dir_exists() {
+        let dir = codex_dir();
+        assert!(dir.exists(), "codex directory should exist at {:?}", dir);
+    }
+
+    #[test]
+    fn test_codex_cli_version_format() {
+        let version = get_codex_cli_version();
+        assert!(version.is_some(), "codex CLI version should be available");
+        let v = version.unwrap();
+        // Should be like "0.137.0"
+        let parts: Vec<&str> = v.split('.').collect();
+        assert!(parts.len() >= 2, "version should have at least major.minor: {}", v);
+    }
+
+    #[test]
+    fn test_codex_desktop_version_format() {
+        let version = get_codex_desktop_version();
+        if let Some(v) = version {
+            // Desktop version is like "26.602.40724"
+            assert!(v.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false),
+                "desktop version should start with a digit: {}", v);
+        }
+    }
+
+    #[test]
+    fn test_codex_cli_and_desktop_versions_differ() {
+        let cli = get_codex_cli_version();
+        let desktop = get_codex_desktop_version();
+        if let (Some(cv), Some(dv)) = (&cli, &desktop) {
+            assert_ne!(cv, dv, "CLI version ({}) should differ from Desktop version ({})", cv, dv);
+        }
+    }
+
+    #[test]
+    fn test_detect_returns_correct_fields() {
+        let info = detect();
+        assert_eq!(info.name, "Codex");
+        assert_eq!(info.agent_type, AgentType::Codex);
+    }
+
+    #[test]
+    fn test_state_db_exists() {
+        let db_path = state_db_path();
+        assert!(db_path.exists(), "state_5.sqlite should exist at {:?}", db_path);
+    }
+
+    #[test]
+    fn test_state_db_has_threads_table() {
+        let db_path = state_db_path();
+        if !db_path.exists() {
+            return;
+        }
+        let conn = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let result = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='threads'",
+            [],
+            |row| row.get::<_, i32>(0),
+        );
+        assert!(result.unwrap_or(0) > 0, "threads table should exist in state_5.sqlite");
+    }
+
+    #[test]
+    fn test_threads_table_has_source_column() {
+        let db_path = state_db_path();
+        if !db_path.exists() {
+            return;
+        }
+        let conn = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        // Query to check if source column exists
+        let result = conn.prepare("SELECT source FROM threads LIMIT 1");
+        assert!(result.is_ok(), "threads table should have 'source' column");
+    }
+
+    #[test]
+    fn test_count_sessions_by_mode() {
+        let (cli, gui) = count_sessions_by_mode();
+        // We know from the system that there are both CLI and GUI sessions
+        assert!(cli + gui > 0, "should have at least some sessions");
+    }
+}

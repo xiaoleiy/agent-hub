@@ -230,3 +230,71 @@ fn parse_window(window: &str) -> chrono::Duration {
         _ => chrono::Duration::hours(5),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_claude_binary_exists() {
+        let claude_bin = home().join(".local/bin/claude");
+        assert!(claude_bin.exists(), "claude binary should exist at {:?}", claude_bin);
+    }
+
+    #[test]
+    fn test_claude_cli_version_format() {
+        let version = get_claude_cli_version();
+        assert!(version.is_some(), "claude -v should return a value");
+        let v = version.unwrap();
+        // Should be like "2.1.168"
+        let parts: Vec<&str> = v.split('.').collect();
+        assert!(parts.len() >= 2, "version should have at least major.minor: {}", v);
+        for part in &parts {
+            assert!(part.chars().all(|c| c.is_ascii_digit()),
+                "version part should be numeric: {} in {}", part, v);
+        }
+    }
+
+    #[test]
+    fn test_detect_returns_correct_fields() {
+        let info = detect();
+        assert_eq!(info.name, "Claude Code");
+        assert_eq!(info.agent_type, AgentType::ClaudeCode);
+        // CLI version should be present since claude is installed
+        assert!(info.cli_version.is_some(), "cli_version should be set");
+    }
+
+    #[test]
+    fn test_sessions_dir_exists() {
+        let dir = sessions_dir();
+        assert!(dir.exists(), "sessions directory should exist at {:?}", dir);
+    }
+
+    #[test]
+    fn test_parse_window() {
+        assert_eq!(parse_window("5h"), chrono::Duration::hours(5));
+        assert_eq!(parse_window("1w"), chrono::Duration::weeks(1));
+        assert_eq!(parse_window("1m"), chrono::Duration::days(30));
+        assert_eq!(parse_window("other"), chrono::Duration::hours(5));
+    }
+
+    #[test]
+    fn test_claude_session_json_parsing() {
+        let json = r#"{"pid":12345,"session_id":"abc","cwd":"/tmp","started_at":1000,"version":"2.1.168","status":"busy","entrypoint":"cli"}"#;
+        let sess: ClaudeSession = serde_json::from_str(json).unwrap();
+        assert_eq!(sess.pid, 12345);
+        assert_eq!(sess.session_id, "abc");
+        assert_eq!(sess.version, "2.1.168");
+        assert_eq!(sess.entrypoint, "cli");
+    }
+
+    #[test]
+    fn test_claude_session_json_defaults() {
+        let json = r#"{"pid":12345}"#;
+        let sess: ClaudeSession = serde_json::from_str(json).unwrap();
+        assert_eq!(sess.pid, 12345);
+        assert_eq!(sess.session_id, "");
+        assert_eq!(sess.version, "");
+        assert_eq!(sess.entrypoint, "");
+    }
+}
