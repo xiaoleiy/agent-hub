@@ -44,7 +44,10 @@ pub struct AgentInfo {
     pub active_sessions: usize,
     pub cli_sessions: usize,
     pub gui_sessions: usize,
+    /// Primary version (for backward compat)
     pub version: Option<String>,
+    pub cli_version: Option<String>,
+    pub gui_version: Option<String>,
     pub install_path: Option<String>,
 }
 

@@ -24,15 +24,21 @@ pub fn detect() -> AgentInfo {
     // Count recent sessions from DB as GUI sessions
     let gui_sessions = if running { count_active_conversations() } else { 0 };
 
+    let gui_version = get_cursor_gui_version();
+    let cli_version = get_cursor_cli_version();
+    let version = gui_version.clone().or(cli_version.clone());
+
     AgentInfo {
         name: "Cursor".to_string(),
         agent_type: AgentType::Cursor,
         installed,
         running,
         active_sessions: gui_sessions,
-        cli_sessions: 0, // Cursor is GUI-only
+        cli_sessions: 0,
         gui_sessions,
-        version: get_cursor_version(),
+        version,
+        cli_version,
+        gui_version,
         install_path: if app_path.exists() {
             Some(app_path.to_string_lossy().to_string())
         } else {
@@ -69,7 +75,7 @@ fn count_active_conversations() -> usize {
     .unwrap_or(1)
 }
 
-fn get_cursor_version() -> Option<String> {
+fn get_cursor_gui_version() -> Option<String> {
     let plist = PathBuf::from("/Applications/Cursor.app/Contents/Info.plist");
     if plist.exists() {
         if let Ok(output) = std::process::Command::new("defaults")
@@ -78,7 +84,27 @@ fn get_cursor_version() -> Option<String> {
             .arg("CFBundleShortVersionString")
             .output()
         {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            let v = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !v.is_empty() {
+                return Some(v);
+            }
+        }
+    }
+    None
+}
+
+fn get_cursor_cli_version() -> Option<String> {
+    if let Ok(output) = std::process::Command::new("cursor")
+        .arg("--version")
+        .output()
+    {
+        if output.status.success() {
+            // cursor --version outputs multiple lines; first line is the version
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let first_line = stdout.lines().next().unwrap_or("").trim();
+            if !first_line.is_empty() {
+                return Some(first_line.to_string());
+            }
         }
     }
     None

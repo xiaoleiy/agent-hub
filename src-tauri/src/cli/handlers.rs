@@ -120,11 +120,16 @@ pub fn agents(json: bool) {
             "✕".dimmed()
         };
 
-        let version_str = agent
-            .version
-            .as_ref()
-            .map(|v| format!("v{}", v))
-            .unwrap_or_else(|| "unknown".to_string());
+        // Build version display
+        let version_str = match (&agent.cli_version, &agent.gui_version) {
+            (Some(cv), Some(gv)) if cv != gv => {
+                format!("CLI v{} / GUI v{}", cv, gv)
+            }
+            (Some(cv), Some(_gv)) => format!("v{}", cv),
+            (Some(cv), None) => format!("CLI v{}", cv),
+            (None, Some(gv)) => format!("GUI v{}", gv),
+            _ => "unknown".to_string(),
+        };
 
         let session_detail = if agent.running {
             let mut parts = Vec::new();

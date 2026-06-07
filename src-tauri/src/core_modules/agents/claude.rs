@@ -25,7 +25,8 @@ pub fn detect() -> AgentInfo {
     let mut cli_sessions = 0usize;
     let mut gui_sessions = 0usize;
     let mut running = false;
-    let mut version: Option<String> = None;
+    let mut cli_version: Option<String> = None;
+    let mut gui_version: Option<String> = None;
 
     if sessions.exists() {
         if let Ok(entries) = fs::read_dir(&sessions) {
@@ -39,14 +40,29 @@ pub fn detect() -> AgentInfo {
                                 _ => gui_sessions += 1,
                             }
                         }
-                        if version.is_none() && !sess.version.is_empty() {
-                            version = Some(sess.version.clone());
+                        // Track latest version per entrypoint type
+                        if !sess.version.is_empty() {
+                            match sess.entrypoint.as_str() {
+                                "cli" => {
+                                    cli_version = Some(sess.version.clone());
+                                }
+                                "sdk-cli" => {
+                                    if cli_version.is_none() {
+                                        cli_version = Some(sess.version.clone());
+                                    }
+                                }
+                                _ => {
+                                    gui_version = Some(sess.version.clone());
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
+
+    let version = cli_version.clone().or(gui_version.clone());
 
     AgentInfo {
         name: "Claude Code".to_string(),
@@ -57,6 +73,8 @@ pub fn detect() -> AgentInfo {
         cli_sessions,
         gui_sessions,
         version,
+        cli_version,
+        gui_version,
         install_path: if installed {
             Some(home().join(".local/bin/claude").to_string_lossy().to_string())
         } else {

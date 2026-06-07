@@ -11,6 +11,18 @@
         ? "installed"
         : "not found"
   );
+
+  function versionDisplay(agent) {
+    const cv = agent.cli_version;
+    const gv = agent.gui_version;
+    if (cv && gv && cv !== gv) return { cli: cv, gui: gv };
+    if (cv && gv) return { single: cv };
+    if (cv) return { cli: cv };
+    if (gv) return { gui: gv };
+    return {};
+  }
+
+  const v = $derived(versionDisplay(agent));
 </script>
 
 <div class="agent-card" class:running={agent.running}>
@@ -20,11 +32,22 @@
   </div>
 
   <div class="details">
-    {#if agent.version}
-      <span class="version">v{agent.version}</span>
+    {#if v.single}
+      <span class="version">v{v.single}</span>
     {/if}
     <span class="status">{statusText}</span>
   </div>
+
+  {#if v.cli || v.gui}
+    <div class="versions">
+      {#if v.cli}
+        <span class="ver-badge cli">CLI v{v.cli}</span>
+      {/if}
+      {#if v.gui}
+        <span class="ver-badge gui">GUI v{v.gui}</span>
+      {/if}
+    </div>
+  {/if}
 
   {#if agent.running}
     <div class="sessions">
@@ -93,6 +116,31 @@
   .status {
     font-size: 0.8rem;
     color: #aaa;
+  }
+
+  .versions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .ver-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    font-family: "SF Mono", "Fira Code", monospace;
+  }
+
+  .ver-badge.cli {
+    background: #0ea5e920;
+    color: #0ea5e9;
+  }
+
+  .ver-badge.gui {
+    background: #a855f720;
+    color: #a855f7;
   }
 
   .sessions {

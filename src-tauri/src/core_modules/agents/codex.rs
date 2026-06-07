@@ -22,7 +22,8 @@ fn process_manager_path() -> PathBuf {
 /// Detect Codex CLI installation and running state
 pub fn detect() -> AgentInfo {
     let codex_bin = PathBuf::from("/opt/homebrew/bin/codex");
-    let installed = codex_bin.exists() || codex_dir().exists();
+    let codex_app = PathBuf::from("/Applications/Codex.app");
+    let installed = codex_bin.exists() || codex_dir().exists() || codex_app.exists();
 
     // Check live processes
     let live_processes = get_live_pids();
@@ -30,6 +31,10 @@ pub fn detect() -> AgentInfo {
 
     // Count CLI vs GUI sessions from DB
     let (cli_sessions, gui_sessions) = count_sessions_by_mode();
+
+    let cli_version = get_codex_cli_version();
+    let gui_version = get_codex_desktop_version();
+    let version = cli_version.clone().or(gui_version.clone());
 
     AgentInfo {
         name: "Codex".to_string(),
@@ -39,9 +44,13 @@ pub fn detect() -> AgentInfo {
         active_sessions: cli_sessions + gui_sessions,
         cli_sessions,
         gui_sessions,
-        version: get_codex_version(),
+        version,
+        cli_version,
+        gui_version,
         install_path: if codex_bin.exists() {
             Some(codex_bin.to_string_lossy().to_string())
+        } else if codex_app.exists() {
+            Some(codex_app.to_string_lossy().to_string())
         } else {
             None
         },
@@ -121,19 +130,36 @@ fn count_sessions_by_mode() -> (usize, usize) {
     (cli, gui)
 }
 
-fn get_codex_version() -> Option<String> {
+fn get_codex_cli_version() -> Option<String> {
     let version_path = codex_dir().join("version.json");
     if let Ok(data) = std::fs::read_to_string(&version_path) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&data) {
-            return v
-                .get("latest_version")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+            if let Some(ver) = v.get("latest_version").and_then(|v| v.as_str()) {
+                return Some(ver.to_string());
+            }
         }
     }
     if let Ok(output) = std::process::Command::new("codex").arg("--version").output() {
         if output.status.success() {
             return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    }
+    None
+}
+
+fn get_codex_desktop_version() -> Option<String> {
+    let plist = PathBuf::from("/Applications/Codex.app/Contents/Info.plist");
+    if plist.exists() {
+        if let Ok(output) = std::process::Command::new("defaults")
+            .arg("read")
+            .arg(&plist)
+            .arg("CFBundleShortVersionString")
+            .output()
+        {
+            let v = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !v.is_empty() {
+                return Some(v);
+            }
         }
     }
     None

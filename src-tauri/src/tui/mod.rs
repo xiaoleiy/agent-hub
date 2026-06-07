@@ -447,12 +447,18 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
             } else {
                 "not found".to_string()
             };
-            let version = a.version.as_deref().unwrap_or("?");
+            let version = match (&a.cli_version, &a.gui_version) {
+                (Some(cv), Some(gv)) if cv != gv => format!("CLI {} / GUI {}", cv, gv),
+                (Some(cv), Some(_)) => format!("v{}", cv),
+                (Some(cv), None) => format!("CLI v{}", cv),
+                (None, Some(gv)) => format!("GUI v{}", gv),
+                _ => "?".to_string(),
+            };
 
             Row::new(vec![
                 Cell::from(status_icon).style(Style::default().fg(status_color)),
                 Cell::from(a.name.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
-                Cell::from(format!("v{}", version)).style(Style::default().fg(Color::DarkGray)),
+                Cell::from(version).style(Style::default().fg(Color::DarkGray)),
                 Cell::from(status_text).style(Style::default().fg(status_color)),
             ])
         })
