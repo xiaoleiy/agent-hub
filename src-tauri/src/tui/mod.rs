@@ -316,6 +316,7 @@ fn draw_system_status(f: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(1), // spacer
             Constraint::Length(1), // uptime
             Constraint::Length(1), // user
+            Constraint::Length(1), // host
             Constraint::Length(1), // network
         ])
         .split(inner);
@@ -354,13 +355,17 @@ fn draw_system_status(f: &mut Frame, app: &App, area: Rect) {
         .style(Style::default().fg(Color::Gray));
     f.render_widget(user, rows[7]);
 
+    let host = Paragraph::new(format!(" Host: {}", s.hostname))
+        .style(Style::default().fg(Color::Gray));
+    f.render_widget(host, rows[8]);
+
     let net = Paragraph::new(format!(
         " ↑ {}  ↓ {}",
         format_rate(s.network_upload_rate),
         format_rate(s.network_download_rate)
     ))
     .style(Style::default().fg(Color::Gray));
-    f.render_widget(net, rows[8]);
+    f.render_widget(net, rows[9]);
 }
 
 fn draw_network(f: &mut Frame, app: &App, area: Rect) {

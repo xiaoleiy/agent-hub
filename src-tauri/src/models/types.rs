@@ -11,6 +11,7 @@ pub struct SystemStatus {
     pub uptime_seconds: u64,
     pub uptime_formatted: String,
     pub username: String,
+    pub hostname: String,
     pub network_upload_bytes: u64,
     pub network_download_bytes: u64,
     pub network_upload_rate: f64,

@@ -56,6 +56,11 @@
       </div>
 
       <div class="stat">
+        <span class="label">Host</span>
+        <span class="value standalone">{status.hostname}</span>
+      </div>
+
+      <div class="stat">
         <span class="label">Upload</span>
         <span class="value standalone">{formatRate(status.network_upload_rate)}</span>
       </div>

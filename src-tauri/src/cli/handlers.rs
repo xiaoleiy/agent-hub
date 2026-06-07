@@ -49,6 +49,11 @@ pub fn status(json: bool) {
     );
     println!(
         "  {} {}",
+        "Host:".dimmed(),
+        status.hostname.cyan()
+    );
+    println!(
+        "  {} {}",
         "Upload:".dimmed(),
         format_rate(status.network_upload_rate).cyan()
     );

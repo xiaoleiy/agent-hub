@@ -36,8 +36,9 @@ pub fn get_system_status() -> SystemStatus {
     let uptime_secs = System::uptime();
     let uptime_formatted = format_uptime(uptime_secs);
 
-    // Username
+    // Username & hostname
     let username = whoami::username();
+    let hostname = whoami::fallible::hostname().unwrap_or_default();
 
     // Network I/O (aggregate all interfaces)
     let networks = Networks::new_with_refreshed_list();
@@ -85,6 +86,7 @@ pub fn get_system_status() -> SystemStatus {
         uptime_seconds: uptime_secs,
         uptime_formatted,
         username,
+        hostname,
         network_upload_bytes: total_tx,
         network_download_bytes: total_rx,
         network_upload_rate: (upload_rate * 100.0).round() / 100.0,
