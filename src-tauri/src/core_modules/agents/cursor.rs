@@ -94,12 +94,31 @@ fn get_cursor_gui_version() -> Option<String> {
 }
 
 fn get_cursor_cli_version() -> Option<String> {
+    // Try cursor-agent first (the CLI/TUI variant)
+    let candidate = home().join(".local/bin/cursor-agent");
+    let cmd = if candidate.exists() {
+        candidate.to_string_lossy().to_string()
+    } else {
+        "cursor-agent".to_string()
+    };
+    if let Ok(output) = std::process::Command::new(&cmd)
+        .arg("--version")
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let first_line = stdout.lines().next().unwrap_or("").trim();
+            if !first_line.is_empty() {
+                return Some(first_line.to_string());
+            }
+        }
+    }
+    // Fallback to cursor --version
     if let Ok(output) = std::process::Command::new("cursor")
         .arg("--version")
         .output()
     {
         if output.status.success() {
-            // cursor --version outputs multiple lines; first line is the version
             let stdout = String::from_utf8_lossy(&output.stdout);
             let first_line = stdout.lines().next().unwrap_or("").trim();
             if !first_line.is_empty() {
