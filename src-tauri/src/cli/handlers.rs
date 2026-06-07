@@ -141,9 +141,9 @@ pub fn agents(json: bool) {
             }
             format!("{} active ({})", agent.active_sessions, parts.join(", ")).green()
         } else if agent.installed {
-            "installed, not running".yellow()
+            "Not Opened".yellow()
         } else {
-            "not installed".dimmed()
+            "Not Found".dimmed()
         };
 
         println!(

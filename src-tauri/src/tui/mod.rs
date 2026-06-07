@@ -443,22 +443,20 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
                 }
                 format!("{} ({})", a.active_sessions, parts.join(", "))
             } else if a.installed {
-                "installed".to_string()
+                "Not Opened".to_string()
             } else {
-                "not found".to_string()
+                "Not Found".to_string()
             };
-            let version = match (&a.cli_version, &a.gui_version) {
-                (Some(cv), Some(gv)) if cv != gv => format!("CLI {} / GUI {}", cv, gv),
-                (Some(cv), Some(_)) => format!("v{}", cv),
-                (Some(cv), None) => format!("CLI v{}", cv),
-                (None, Some(gv)) => format!("GUI v{}", gv),
-                _ => "?".to_string(),
-            };
+
+            // Show CLI and GUI versions in separate cells
+            let cli_v = a.cli_version.as_deref().unwrap_or("—");
+            let gui_v = a.gui_version.as_deref().unwrap_or("—");
 
             Row::new(vec![
                 Cell::from(status_icon).style(Style::default().fg(status_color)),
                 Cell::from(a.name.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
-                Cell::from(version).style(Style::default().fg(Color::DarkGray)),
+                Cell::from(cli_v).style(Style::default().fg(Color::Cyan)),
+                Cell::from(gui_v).style(Style::default().fg(Color::Magenta)),
                 Cell::from(status_text).style(Style::default().fg(status_color)),
             ])
         })
@@ -467,12 +465,13 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
     let widths = [
         Constraint::Length(2),
         Constraint::Length(14),
-        Constraint::Length(10),
-        Constraint::Min(10),
+        Constraint::Length(18),
+        Constraint::Length(14),
+        Constraint::Min(14),
     ];
 
     let table = Table::new(rows, widths).header(
-        Row::new(vec!["", "Agent", "Version", "Status"])
+        Row::new(vec!["", "Agent", "CLI Ver", "GUI Ver", "Status"])
             .style(Style::default().fg(Color::DarkGray)),
     );
     f.render_widget(table, inner);

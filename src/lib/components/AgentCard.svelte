@@ -8,8 +8,8 @@
     agent.running
       ? `${agent.active_sessions} active`
       : agent.installed
-        ? "installed"
-        : "not found"
+        ? "Not Opened"
+        : "Not Found"
   );
 
   function versionDisplay(agent) {
