@@ -465,8 +465,8 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
     let widths = [
         Constraint::Length(2),
         Constraint::Length(14),
-        Constraint::Length(18),
-        Constraint::Length(14),
+        Constraint::Length(22),
+        Constraint::Length(16),
         Constraint::Min(14),
     ];
 
