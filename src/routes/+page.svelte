@@ -15,53 +15,73 @@
   let usageWindow = $state("5h");
   let usageStats = $state([]);
   let keepAliveStatus = $state(null);
-  let error = $state(null);
 
   let pollInterval;
+  let networkLoaded = false;
 
-  async function fetchAll() {
+  async function fetchSystem() {
     try {
       systemStatus = await invoke("get_system_status");
     } catch (e) {
       console.error("Failed to fetch system status:", e);
     }
+  }
 
+  async function fetchAgents() {
     try {
       agents = await invoke("get_agents");
     } catch (e) {
       console.error("Failed to fetch agents:", e);
     }
+  }
 
+  async function fetchSessions() {
     try {
-      sessions = await invoke("get_agent_sessions", { agent: "" });
+      // Fetch sessions for each agent individually
+      const allSessions = [];
+      const agentNames = ["claude", "cursor", "codex"];
+      for (const name of agentNames) {
+        try {
+          const s = await invoke("get_agent_sessions", { agent: name });
+          allSessions.push(...s);
+        } catch (_) { /* agent may not be installed */ }
+      }
+      sessions = allSessions;
     } catch (e) {
       console.error("Failed to fetch sessions:", e);
     }
+  }
 
+  async function fetchKeepAlive() {
     try {
       keepAliveStatus = await invoke("get_keepalive_status");
     } catch (e) {
-      console.error("Failed to fetch keepalive status:", e);
+      console.error("Failed to fetch keepalive:", e);
     }
   }
 
   async function fetchNetwork() {
+    if (networkLoaded) return;
     try {
       networkInfo = await invoke("get_network_info");
+      networkLoaded = true;
     } catch (e) {
       console.error("Failed to fetch network info:", e);
     }
   }
 
   async function fetchUsage() {
+    if (agents.length === 0) return;
     try {
       const allUsage = [];
       for (const agent of agents) {
-        const u = await invoke("get_agent_usage", {
-          agent: agent.name,
-          window: usageWindow,
-        });
-        allUsage.push(u);
+        try {
+          const u = await invoke("get_agent_usage", {
+            agent: agent.name,
+            window: usageWindow,
+          });
+          allUsage.push(u);
+        } catch (_) { /* skip */ }
       }
       usageStats = allUsage;
     } catch (e) {
@@ -69,24 +89,28 @@
     }
   }
 
+  async function fetchAll() {
+    await Promise.all([fetchSystem(), fetchAgents(), fetchSessions(), fetchKeepAlive()]);
+  }
+
+  // Fetch usage whenever agents or window changes
+  $effect(() => {
+    // Access reactive deps
+    const _ = agents;
+    const __ = usageWindow;
+    fetchUsage();
+  });
+
   onMount(() => {
     fetchAll();
     fetchNetwork();
-    // Poll system stats every 3 seconds
     pollInterval = setInterval(() => {
       fetchAll();
-    }, 3000);
+    }, 5000);
   });
 
   onDestroy(() => {
     if (pollInterval) clearInterval(pollInterval);
-  });
-
-  // Refetch usage when window changes
-  $effect(() => {
-    if (agents.length > 0) {
-      fetchUsage();
-    }
   });
 </script>
 
@@ -109,7 +133,7 @@
   <section class="card agents-section">
     <h2>Agents</h2>
     <div class="agent-grid">
-      {#each agents as agent}
+      {#each agents as agent (agent.name)}
         <AgentCard {agent} />
       {/each}
     </div>

@@ -1,5 +1,12 @@
 <script>
   let { status } = $props();
+
+  function formatBytes(bytes) {
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + " GB";
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + " MB";
+    if (bytes >= 1024) return (bytes / 1024).toFixed(2) + " KB";
+    return bytes + " B";
+  }
 </script>
 
 <div class="system-status">
@@ -56,15 +63,6 @@
     <p class="loading">Loading...</p>
   {/if}
 </div>
-
-<script>
-  function formatBytes(bytes) {
-    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + " GB";
-    if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + " MB";
-    if (bytes >= 1024) return (bytes / 1024).toFixed(2) + " KB";
-    return bytes + " B";
-  }
-</script>
 
 <style>
   .system-status h2 {
