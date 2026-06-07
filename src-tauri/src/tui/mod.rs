@@ -421,10 +421,10 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    let rows: Vec<Row> = app
+    let lines: Vec<Line> = app
         .agents
         .iter()
-        .map(|a| {
+        .flat_map(|a| {
             let status_icon = if a.running { "●" } else if a.installed { "○" } else { "✕" };
             let status_color = if a.running {
                 Color::Green
@@ -441,40 +441,37 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
                 if a.gui_sessions > 0 {
                     parts.push(format!("{} GUI", a.gui_sessions));
                 }
-                format!("{} ({})", a.active_sessions, parts.join(", "))
+                format!("{} active ({})", a.active_sessions, parts.join(", "))
             } else if a.installed {
                 "Not Opened".to_string()
             } else {
                 "Not Found".to_string()
             };
 
-            // Show CLI and GUI versions in separate cells
             let cli_v = a.cli_version.as_deref().unwrap_or("—");
             let gui_v = a.gui_version.as_deref().unwrap_or("—");
 
-            Row::new(vec![
-                Cell::from(status_icon).style(Style::default().fg(status_color)),
-                Cell::from(a.name.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
-                Cell::from(cli_v).style(Style::default().fg(Color::Cyan)),
-                Cell::from(gui_v).style(Style::default().fg(Color::Magenta)),
-                Cell::from(status_text).style(Style::default().fg(status_color)),
-            ])
+            // Line 1: icon + name + status
+            let header = Line::from(vec![
+                Span::styled(format!(" {} ", status_icon), Style::default().fg(status_color)),
+                Span::styled(format!("{:<14}", a.name), Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled(status_text, Style::default().fg(status_color)),
+            ]);
+            // Line 2: versions indented
+            let versions = Line::from(vec![
+                Span::raw("   "),
+                Span::styled("CLI: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(cli_v.to_string(), Style::default().fg(Color::Cyan)),
+                Span::raw("   "),
+                Span::styled("GUI: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(gui_v.to_string(), Style::default().fg(Color::Magenta)),
+            ]);
+            vec![header, versions]
         })
         .collect();
 
-    let widths = [
-        Constraint::Length(2),
-        Constraint::Length(14),
-        Constraint::Length(22),
-        Constraint::Length(16),
-        Constraint::Min(14),
-    ];
-
-    let table = Table::new(rows, widths).header(
-        Row::new(vec!["", "Agent", "CLI Ver", "GUI Ver", "Status"])
-            .style(Style::default().fg(Color::DarkGray)),
-    );
-    f.render_widget(table, inner);
+    let p = Paragraph::new(lines);
+    f.render_widget(p, inner);
 }
 
 fn draw_sessions(f: &mut Frame, app: &App, area: Rect) {
