@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod core_modules;
 mod models;
+mod tui;
 
 use std::env;
 

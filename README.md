@@ -42,6 +42,23 @@ agent-hub
 agent-hub gui
 ```
 
+### TUI (Terminal UI)
+
+Interactive terminal dashboard (like `htop`):
+
+```bash
+agent-hub tui
+```
+
+Keybindings:
+- `←`/`→` or `Tab` — switch tabs
+- `1`/`2`/`3`/`4` — jump to tab
+- `r` — refresh
+- `w` — cycle usage window (5h → 1w → 1m)
+- `Space` — toggle keep-alive (1h default)
+- `a`/`s`/`d`/`f` — set keep-alive (30m/1h/3h/forever)
+- `q`/`Esc` — quit
+
 ### CLI
 
 ```bash
@@ -86,6 +103,7 @@ agent-hub
 │   └── src/
 │       ├── lib.rs          # CLI/GUI router
 │       ├── cli/            # CLI argument parsing (clap)
+│       ├── tui/            # Interactive terminal UI (ratatui)
 │       ├── core_modules/   # Business logic
 │       │   ├── system.rs   # System stats (sysinfo)
 │       │   ├── network.rs  # IP lookup (reqwest)
@@ -109,6 +127,9 @@ npm run tauri build
 
 # Run CLI directly
 cargo run --manifest-path src-tauri/Cargo.toml -- status
+
+# Run TUI directly
+cargo run --manifest-path src-tauri/Cargo.toml -- tui
 ```
 
 ## License

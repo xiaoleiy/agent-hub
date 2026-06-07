@@ -64,6 +64,9 @@ pub enum Commands {
         status: bool,
     },
 
+    /// Launch the interactive terminal UI (TUI dashboard)
+    Tui,
+
     /// Launch the GUI window
     Gui,
 }
@@ -82,6 +85,9 @@ pub fn run_cli(args: &[String]) {
             json,
         }) => handlers::usage(&window, agent, json),
         Some(Commands::Keepalive { mode, status }) => handlers::keepalive(mode, status),
+        Some(Commands::Tui) => {
+            crate::tui::run_tui();
+        }
         Some(Commands::Gui) => {
             // GUI mode — this shouldn't normally be reached since lib.rs
             // handles the "gui" arg, but just in case:
