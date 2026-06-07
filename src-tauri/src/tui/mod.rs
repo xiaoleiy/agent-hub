@@ -434,7 +434,14 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
                 Color::DarkGray
             };
             let status_text = if a.running {
-                format!("{} active", a.active_sessions)
+                let mut parts = Vec::new();
+                if a.cli_sessions > 0 {
+                    parts.push(format!("{} CLI", a.cli_sessions));
+                }
+                if a.gui_sessions > 0 {
+                    parts.push(format!("{} GUI", a.gui_sessions));
+                }
+                format!("{} ({})", a.active_sessions, parts.join(", "))
             } else if a.installed {
                 "installed".to_string()
             } else {
@@ -500,9 +507,17 @@ fn draw_sessions(f: &mut Frame, app: &App, area: Rect) {
                 .map(relative_time)
                 .unwrap_or_default();
 
+            let ep = if s.entrypoint.is_empty() { "—" } else { &s.entrypoint };
+            let ep_style = match ep {
+                "cli" | "sdk-cli" => Style::default().fg(Color::Cyan),
+                "vscode" | "exec" => Style::default().fg(Color::Magenta),
+                _ => Style::default().fg(Color::DarkGray),
+            };
+
             Row::new(vec![
                 Cell::from(s.agent.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
-                Cell::from(s.id.chars().take(20).collect::<String>()),
+                Cell::from(s.id.chars().take(18).collect::<String>()),
+                Cell::from(ep).style(ep_style),
                 Cell::from(s.status.as_str()).style(status_style),
                 Cell::from(cwd_short),
                 Cell::from(time).style(Style::default().fg(Color::DarkGray)),
@@ -512,14 +527,15 @@ fn draw_sessions(f: &mut Frame, app: &App, area: Rect) {
 
     let widths = [
         Constraint::Length(14),
-        Constraint::Length(22),
+        Constraint::Length(20),
+        Constraint::Length(8),
         Constraint::Length(10),
-        Constraint::Min(20),
-        Constraint::Length(10),
+        Constraint::Min(18),
+        Constraint::Length(8),
     ];
 
     let table = Table::new(rows, widths).header(
-        Row::new(vec!["Agent", "Session", "Status", "Working Dir", "Time"])
+        Row::new(vec!["Agent", "Session", "Mode", "Status", "Working Dir", "Time"])
             .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
     );
     f.render_widget(table, inner);

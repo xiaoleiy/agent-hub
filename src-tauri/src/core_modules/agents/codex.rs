@@ -24,16 +24,21 @@ pub fn detect() -> AgentInfo {
     let codex_bin = PathBuf::from("/opt/homebrew/bin/codex");
     let installed = codex_bin.exists() || codex_dir().exists();
 
-    // Check live processes via process_manager file or pgrep
+    // Check live processes
     let live_processes = get_live_pids();
     let running = !live_processes.is_empty() || is_codex_running();
+
+    // Count CLI vs GUI sessions from DB
+    let (cli_sessions, gui_sessions) = count_sessions_by_mode();
 
     AgentInfo {
         name: "Codex".to_string(),
         agent_type: AgentType::Codex,
         installed,
         running,
-        active_sessions: live_processes.len().max(if running { 1 } else { 0 }),
+        active_sessions: cli_sessions + gui_sessions,
+        cli_sessions,
+        gui_sessions,
         version: get_codex_version(),
         install_path: if codex_bin.exists() {
             Some(codex_bin.to_string_lossy().to_string())
@@ -83,6 +88,39 @@ fn is_pid_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
+/// Count CLI vs GUI sessions from the threads table
+fn count_sessions_by_mode() -> (usize, usize) {
+    let db_path = state_db_path();
+    if !db_path.exists() {
+        return (0, 0);
+    }
+    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        Ok(c) => c,
+        Err(_) => return (0, 0),
+    };
+    let mut stmt = match conn.prepare(
+        "SELECT source FROM threads WHERE archived = 0",
+    ) {
+        Ok(s) => s,
+        Err(_) => return (0, 0),
+    };
+    let mut cli = 0usize;
+    let mut gui = 0usize;
+    if let Ok(rows) = stmt.query_map([], |row| {
+        let source: String = row.get(0).unwrap_or_default();
+        Ok(source)
+    }) {
+        for row in rows.flatten() {
+            if row == "cli" {
+                cli += 1;
+            } else {
+                gui += 1;
+            }
+        }
+    }
+    (cli, gui)
+}
+
 fn get_codex_version() -> Option<String> {
     let version_path = codex_dir().join("version.json");
     if let Ok(data) = std::fs::read_to_string(&version_path) {
@@ -93,7 +131,6 @@ fn get_codex_version() -> Option<String> {
                 .map(|s| s.to_string());
         }
     }
-    // Fallback: try running codex --version
     if let Ok(output) = std::process::Command::new("codex").arg("--version").output() {
         if output.status.success() {
             return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
@@ -109,8 +146,7 @@ pub fn get_sessions() -> Vec<Session> {
         return vec![];
     }
 
-    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-    {
+    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
         Ok(c) => c,
         Err(_) => return vec![],
     };
@@ -135,11 +171,12 @@ pub fn get_sessions() -> Vec<Session> {
             Ok(Session {
                 id: if title.is_empty() { id } else { title },
                 agent: "Codex".to_string(),
-                status: source,
+                status: source.clone(),
                 started_at: Some(updated_at),
                 working_dir: if cwd.is_empty() { None } else { Some(cwd) },
                 model: if model.is_empty() { None } else { Some(model) },
                 pid: None,
+                entrypoint: source,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -162,7 +199,6 @@ pub fn get_usage(window: &str) -> UsageStats {
         if let Ok(conn) =
             Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         {
-            // Count threads with activity in the window
             if let Ok(mut stmt) = conn.prepare(
                 "SELECT id, tokens_used FROM threads WHERE updated_at >= ?1 AND archived = 0",
             ) {

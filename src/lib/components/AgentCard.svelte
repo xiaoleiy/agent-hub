@@ -26,6 +26,17 @@
     <span class="status">{statusText}</span>
   </div>
 
+  {#if agent.running}
+    <div class="sessions">
+      {#if agent.cli_sessions > 0}
+        <span class="badge cli">{agent.cli_sessions} CLI</span>
+      {/if}
+      {#if agent.gui_sessions > 0}
+        <span class="badge gui">{agent.gui_sessions} GUI</span>
+      {/if}
+    </div>
+  {/if}
+
   {#if agent.install_path}
     <div class="path" title={agent.install_path}>
       {agent.install_path.split("/").pop()}
@@ -82,6 +93,30 @@
   .status {
     font-size: 0.8rem;
     color: #aaa;
+  }
+
+  .sessions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge.cli {
+    background: #0ea5e920;
+    color: #0ea5e9;
+  }
+
+  .badge.gui {
+    background: #a855f720;
+    color: #a855f7;
   }
 
   .path {

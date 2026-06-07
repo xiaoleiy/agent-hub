@@ -30,6 +30,7 @@
         <tr>
           <th>Agent</th>
           <th>Session</th>
+          <th>Mode</th>
           <th>Status</th>
           <th>Working Dir</th>
           <th>Time</th>
@@ -40,6 +41,11 @@
           <tr>
             <td class="agent-name">{sess.agent}</td>
             <td class="session-id">{truncateId(sess.id)}</td>
+            <td>
+              <span class="mode-badge" class:cli={sess.entrypoint === "cli" || sess.entrypoint === "sdk-cli"} class:gui={sess.entrypoint !== "cli" && sess.entrypoint !== "sdk-cli"}>
+                {sess.entrypoint || "—"}
+              </span>
+            </td>
             <td>
               <span class="status-badge" class:busy={sess.status === "busy"} class:idle={sess.status === "idle" || sess.status === "completed"}>
                 {sess.status}
@@ -117,6 +123,26 @@
   .status-badge.idle {
     background: #22c55e20;
     color: #22c55e;
+  }
+
+  .mode-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: #333;
+    color: #888;
+  }
+
+  .mode-badge.cli {
+    background: #0ea5e920;
+    color: #0ea5e9;
+  }
+
+  .mode-badge.gui {
+    background: #a855f720;
+    color: #a855f7;
   }
 
   .workdir {

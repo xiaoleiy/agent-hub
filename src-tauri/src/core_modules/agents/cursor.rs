@@ -21,12 +21,17 @@ pub fn detect() -> AgentInfo {
     let installed = app_path.exists() || cursor_dir().exists();
     let running = is_cursor_running();
 
+    // Count recent sessions from DB as GUI sessions
+    let gui_sessions = if running { count_active_conversations() } else { 0 };
+
     AgentInfo {
         name: "Cursor".to_string(),
         agent_type: AgentType::Cursor,
         installed,
         running,
-        active_sessions: if running { 1 } else { 0 }, // Cursor is one process
+        active_sessions: gui_sessions,
+        cli_sessions: 0, // Cursor is GUI-only
+        gui_sessions,
         version: get_cursor_version(),
         install_path: if app_path.exists() {
             Some(app_path.to_string_lossy().to_string())
@@ -45,8 +50,26 @@ fn is_cursor_running() -> bool {
         .unwrap_or(false)
 }
 
+fn count_active_conversations() -> usize {
+    let db_path = tracking_db_path();
+    if !db_path.exists() {
+        return 1; // running but no DB access = at least 1
+    }
+    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        Ok(c) => c,
+        Err(_) => return 1,
+    };
+    // Count conversations active in the last hour
+    let cutoff = (Utc::now() - chrono::Duration::hours(1)).timestamp_millis();
+    conn.query_row(
+        "SELECT COUNT(*) FROM conversation_summaries WHERE timestamp >= ?1",
+        [cutoff],
+        |row| row.get(0),
+    )
+    .unwrap_or(1)
+}
+
 fn get_cursor_version() -> Option<String> {
-    // Try reading from Info.plist
     let plist = PathBuf::from("/Applications/Cursor.app/Contents/Info.plist");
     if plist.exists() {
         if let Ok(output) = std::process::Command::new("defaults")
@@ -96,8 +119,9 @@ pub fn get_sessions() -> Vec<Session> {
                 status: "completed".to_string(),
                 started_at: Some(started),
                 working_dir: None,
-                model: Some(source),
+                model: Some(source.clone()),
                 pid: None,
+                entrypoint: source,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -120,7 +144,6 @@ pub fn get_usage(window: &str) -> UsageStats {
         if let Ok(conn) =
             Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         {
-            // Count AI code entries in the window
             if let Ok(mut stmt) = conn.prepare(
                 "SELECT conversationId FROM ai_code_hashes WHERE timestamp >= ?1",
             ) {

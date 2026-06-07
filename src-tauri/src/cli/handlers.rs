@@ -126,18 +126,27 @@ pub fn agents(json: bool) {
             .map(|v| format!("v{}", v))
             .unwrap_or_else(|| "unknown".to_string());
 
+        let session_detail = if agent.running {
+            let mut parts = Vec::new();
+            if agent.cli_sessions > 0 {
+                parts.push(format!("{} CLI", agent.cli_sessions));
+            }
+            if agent.gui_sessions > 0 {
+                parts.push(format!("{} GUI", agent.gui_sessions));
+            }
+            format!("{} active ({})", agent.active_sessions, parts.join(", ")).green()
+        } else if agent.installed {
+            "installed, not running".yellow()
+        } else {
+            "not installed".dimmed()
+        };
+
         println!(
             "  {} {} {} — {}",
             status_icon,
             agent.name.bold(),
             version_str.dimmed(),
-            if agent.running {
-                format!("{} active session(s)", agent.active_sessions).green()
-            } else if agent.installed {
-                "installed, not running".yellow()
-            } else {
-                "not installed".dimmed()
-            }
+            session_detail
         );
     }
 }
@@ -176,6 +185,16 @@ pub fn sessions(agent_filter: Option<String>, json: bool) {
             _ => sess.status.normal(),
         };
 
+        let ep = if sess.entrypoint.is_empty() {
+            "—".dimmed()
+        } else {
+            match sess.entrypoint.as_str() {
+                "cli" | "sdk-cli" => sess.entrypoint.cyan(),
+                "vscode" | "exec" => sess.entrypoint.magenta(),
+                _ => sess.entrypoint.dimmed(),
+            }
+        };
+
         let cwd = sess
             .working_dir
             .as_ref()
@@ -183,9 +202,10 @@ pub fn sessions(agent_filter: Option<String>, json: bool) {
             .unwrap_or_default();
 
         println!(
-            "  {} {} — {}{}",
+            "  {} {} [{}] — {}{}",
             sess.agent.bold(),
             sess.id.chars().take(12).collect::<String>().dimmed(),
+            ep,
             status_str,
             cwd
         );

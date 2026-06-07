@@ -21,61 +21,41 @@ pub fn detect() -> AgentInfo {
     let claude_bin = home().join(".local/bin/claude");
     let installed = claude_bin.exists() || which_claude();
     let sessions = sessions_dir();
-    let running = if sessions.exists() {
-        // Check if any session file has a live PID
+
+    let mut cli_sessions = 0usize;
+    let mut gui_sessions = 0usize;
+    let mut running = false;
+    let mut version: Option<String> = None;
+
+    if sessions.exists() {
         if let Ok(entries) = fs::read_dir(&sessions) {
-            entries.filter_map(|e| e.ok()).any(|e| {
-                if let Ok(data) = fs::read_to_string(e.path()) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                if let Ok(data) = fs::read_to_string(entry.path()) {
                     if let Ok(sess) = serde_json::from_str::<ClaudeSession>(&data) {
-                        is_pid_alive(sess.pid)
-                    } else {
-                        false
+                        if is_pid_alive(sess.pid) {
+                            running = true;
+                            match sess.entrypoint.as_str() {
+                                "cli" | "sdk-cli" => cli_sessions += 1,
+                                _ => gui_sessions += 1,
+                            }
+                        }
+                        if version.is_none() && !sess.version.is_empty() {
+                            version = Some(sess.version.clone());
+                        }
                     }
-                } else {
-                    false
                 }
-            })
-        } else {
-            false
+            }
         }
-    } else {
-        false
-    };
-
-    let active_sessions = if sessions.exists() {
-        fs::read_dir(&sessions)
-            .map(|entries| {
-                entries
-                    .filter_map(|e| e.ok())
-                    .filter(|e| {
-                        fs::read_to_string(e.path())
-                            .ok()
-                            .and_then(|d| serde_json::from_str::<ClaudeSession>(&d).ok())
-                            .map(|s| is_pid_alive(s.pid))
-                            .unwrap_or(false)
-                    })
-                    .count()
-            })
-            .unwrap_or(0)
-    } else {
-        0
-    };
-
-    // Try to get version from session files
-    let version = sessions_dir()
-        .read_dir()
-        .ok()
-        .and_then(|mut entries| entries.next()?.ok())
-        .and_then(|e| fs::read_to_string(e.path()).ok())
-        .and_then(|d| serde_json::from_str::<ClaudeSession>(&d).ok())
-        .map(|s| s.version);
+    }
 
     AgentInfo {
         name: "Claude Code".to_string(),
         agent_type: AgentType::ClaudeCode,
         installed,
         running,
-        active_sessions,
+        active_sessions: cli_sessions + gui_sessions,
+        cli_sessions,
+        gui_sessions,
         version,
         install_path: if installed {
             Some(home().join(".local/bin/claude").to_string_lossy().to_string())
@@ -94,7 +74,6 @@ fn which_claude() -> bool {
 }
 
 fn is_pid_alive(pid: u32) -> bool {
-    // kill -0 checks if process exists without sending a signal
     std::process::Command::new("kill")
         .arg("-0")
         .arg(pid.to_string())
@@ -116,6 +95,8 @@ struct ClaudeSession {
     version: String,
     #[serde(default)]
     status: String,
+    #[serde(default)]
+    entrypoint: String,
 }
 
 /// Get active Claude Code sessions
@@ -140,6 +121,11 @@ pub fn get_sessions() -> Vec<Session> {
                             DateTime::from_timestamp_millis(ts as i64).unwrap_or_default();
                         dt.to_rfc3339()
                     });
+                    let ep = if sess.entrypoint.is_empty() {
+                        "cli".to_string()
+                    } else {
+                        sess.entrypoint.clone()
+                    };
                     Some(Session {
                         id: sess.session_id,
                         agent: "Claude Code".to_string(),
@@ -148,6 +134,7 @@ pub fn get_sessions() -> Vec<Session> {
                         working_dir: Some(sess.cwd),
                         model: None,
                         pid: Some(sess.pid),
+                        entrypoint: ep,
                     })
                 })
                 .collect()

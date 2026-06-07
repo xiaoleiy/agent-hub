@@ -42,6 +42,8 @@ pub struct AgentInfo {
     pub installed: bool,
     pub running: bool,
     pub active_sessions: usize,
+    pub cli_sessions: usize,
+    pub gui_sessions: usize,
     pub version: Option<String>,
     pub install_path: Option<String>,
 }
@@ -63,6 +65,8 @@ pub struct Session {
     pub working_dir: Option<String>,
     pub model: Option<String>,
     pub pid: Option<u32>,
+    /// "cli", "gui", "vscode", "sdk", etc.
+    pub entrypoint: String,
 }
 
 /// Usage statistics for an agent
