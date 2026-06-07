@@ -62,7 +62,13 @@ pub fn detect() -> AgentInfo {
         }
     }
 
-    let version = cli_version.clone().or(gui_version.clone());
+    let version = match (&cli_version, &gui_version) {
+        (Some(cv), Some(gv)) if cv != gv => Some(format!("CLI {} / GUI {}", cv, gv)),
+        (Some(cv), Some(_)) => Some(cv.clone()),
+        (Some(cv), None) => Some(cv.clone()),
+        (None, Some(gv)) => Some(gv.clone()),
+        _ => None,
+    };
 
     AgentInfo {
         name: "Claude Code".to_string(),

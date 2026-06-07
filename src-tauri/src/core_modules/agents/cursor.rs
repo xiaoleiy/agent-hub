@@ -24,9 +24,14 @@ pub fn detect() -> AgentInfo {
     // Count recent sessions from DB as GUI sessions
     let gui_sessions = if running { count_active_conversations() } else { 0 };
 
-    let gui_version = get_cursor_gui_version();
     let cli_version = get_cursor_cli_version();
-    let version = gui_version.clone().or(cli_version.clone());
+    let gui_version = get_cursor_gui_version();
+    let version = match (&cli_version, &gui_version) {
+        (Some(cv), Some(gv)) => Some(format!("CLI {} / GUI {}", cv, gv)),
+        (Some(cv), None) => Some(format!("CLI v{}", cv)),
+        (None, Some(gv)) => Some(format!("GUI v{}", gv)),
+        _ => None,
+    };
 
     AgentInfo {
         name: "Cursor".to_string(),
