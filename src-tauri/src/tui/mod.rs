@@ -1,5 +1,5 @@
-use crate::core_modules::{agents, keepalive, network, system};
-use crate::models::types::{AgentInfo, KeepAliveStatus, NetworkInfo, Session, SystemStatus, UsageStats};
+use crate::core_modules::{agents, keepalive, network, proxy, system};
+use crate::models::types::{AgentInfo, KeepAliveStatus, NetworkInfo, ProxyInfo, Session, SystemStatus, UsageStats};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
     execute,
@@ -16,40 +16,78 @@ use ratatui::{
 use std::io;
 use std::time::{Duration, Instant};
 
-const TAB_NAMES: &[&str] = &["Dashboard", "Sessions", "Usage", "Keep-Alive"];
+const MIN_DASHBOARD_WIDTH_FOR_SIDE_BY_SIDE_AGENTS: u16 = 140;
+
+struct DashboardLayout {
+    system: Rect,
+    network: Rect,
+    agents: Rect,
+    usage: Rect,
+}
 
 struct App {
     system: SystemStatus,
     network: Option<NetworkInfo>,
     agents: Vec<AgentInfo>,
-    sessions: Vec<Session>,
-    usage: Vec<UsageStats>,
+    /// Sessions grouped by agent index
+    agent_sessions: Vec<Vec<Session>>,
+    /// Usage stats per agent
+    agent_usage_5h: Vec<UsageStats>,
+    agent_usage_1w: Vec<UsageStats>,
+    proxy: ProxyInfo,
     keepalive: KeepAliveStatus,
     active_tab: usize,
-    usage_window: String,
     last_refresh: Instant,
     network_loaded: bool,
 }
 
 impl App {
     fn new() -> Self {
+        let agents = agents::detect_all_agents();
+        let agent_count = agents.len();
         Self {
             system: system::get_system_status(),
             network: None,
-            agents: agents::detect_all_agents(),
-            sessions: Vec::new(),
-            usage: Vec::new(),
+            agents,
+            agent_sessions: vec![Vec::new(); agent_count],
+            agent_usage_5h: Vec::new(),
+            agent_usage_1w: Vec::new(),
+            proxy: proxy::get_proxy_info(),
             keepalive: keepalive::get_keepalive_status(),
             active_tab: 0,
-            usage_window: "5h".to_string(),
             last_refresh: Instant::now(),
             network_loaded: false,
         }
     }
 
+    /// Build tab names: ["Dashboard", <agent1>, <agent2>, ..., "Proxy / VPN", "Keep-Alive"]
+    fn tab_names(&self) -> Vec<String> {
+        let mut names = vec!["Dashboard".to_string()];
+        for a in &self.agents {
+            if a.installed {
+                names.push(a.name.clone());
+            }
+        }
+        names.push("Proxy / VPN".to_string());
+        names.push("Keep-Alive".to_string());
+        names
+    }
+
+    /// Installed agents only (for tab indexing)
+    fn installed_agents(&self) -> Vec<&AgentInfo> {
+        self.agents.iter().filter(|a| a.installed).collect()
+    }
+
+    /// Number of dynamic tabs
+    fn tab_count(&self) -> usize {
+        // Dashboard + installed agents + Keep-Alive
+        1 + self.installed_agents().len() + 1
+    }
+
     fn refresh(&mut self) {
         self.system = system::get_system_status();
         self.agents = agents::detect_all_agents();
+        self.proxy = proxy::get_proxy_info();
         self.keepalive = keepalive::get_keepalive_status();
 
         // Load network once
@@ -61,41 +99,50 @@ impl App {
             }
         }
 
-        // Sessions
-        self.sessions = Vec::new();
-        for agent in &self.agents {
-            let mut s = agents::get_sessions(&agent.agent_type);
-            self.sessions.append(&mut s);
-        }
-
-        // Usage
-        self.usage = self
+        // Per-agent sessions
+        self.agent_sessions = self
             .agents
             .iter()
-            .map(|a| agents::get_usage(&a.agent_type, &self.usage_window))
+            .map(|a| agents::get_sessions(&a.agent_type))
             .collect();
+
+        // Per-agent usage (5h and 1w)
+        self.agent_usage_5h = self
+            .agents
+            .iter()
+            .map(|a| agents::get_usage(&a.agent_type, "5h"))
+            .collect();
+        self.agent_usage_1w = self
+            .agents
+            .iter()
+            .map(|a| agents::get_usage(&a.agent_type, "1w"))
+            .collect();
+
+        // Clamp active_tab to valid range after agents list may have changed
+        let count = self.tab_count();
+        if count > 0 && self.active_tab >= count {
+            self.active_tab = count - 1;
+        }
 
         self.last_refresh = Instant::now();
     }
 
     fn next_tab(&mut self) {
-        self.active_tab = (self.active_tab + 1) % TAB_NAMES.len();
+        let count = self.tab_count();
+        if count > 0 {
+            self.active_tab = (self.active_tab + 1) % count;
+        }
     }
 
     fn prev_tab(&mut self) {
-        self.active_tab = if self.active_tab == 0 {
-            TAB_NAMES.len() - 1
-        } else {
-            self.active_tab - 1
-        };
-    }
-
-    fn cycle_usage_window(&mut self) {
-        self.usage_window = match self.usage_window.as_str() {
-            "5h" => "1w".to_string(),
-            "1w" => "1m".to_string(),
-            _ => "5h".to_string(),
-        };
+        let count = self.tab_count();
+        if count > 0 {
+            self.active_tab = if self.active_tab == 0 {
+                count - 1
+            } else {
+                self.active_tab - 1
+            };
+        }
     }
 
     fn toggle_keepalive(&mut self) {
@@ -145,18 +192,40 @@ pub fn run_tui() {
         if event::poll(timeout).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
                 if key.kind == KeyEventKind::Press {
+                    let tab_count = app.tab_count();
+                    let last_tab = if tab_count > 0 { tab_count - 1 } else { 0 };
+                    let installed = app.installed_agents();
+
                     match key.code {
                         KeyCode::Char('q') | KeyCode::Esc => break,
                         KeyCode::Right | KeyCode::Tab => app.next_tab(),
                         KeyCode::Left | KeyCode::BackTab => app.prev_tab(),
-                        KeyCode::Char('1') => app.active_tab = 0,
-                        KeyCode::Char('2') => app.active_tab = 1,
-                        KeyCode::Char('3') => app.active_tab = 2,
-                        KeyCode::Char('4') => app.active_tab = 3,
-                        KeyCode::Char('r') => app.refresh(),
+                        // '1' = Dashboard, '2'..=agents, last = Keep-Alive
+                        KeyCode::Char(c @ '1'..='9') => {
+                            let idx = (c as usize) - ('1' as usize);
+                            if idx < tab_count {
+                                app.active_tab = idx;
+                            }
+                        }
+                        // '0' = Keep-Alive (last tab)
+                        KeyCode::Char('0') => {
+                            app.active_tab = last_tab;
+                        }
+                        // Agent shortcuts: q,w,e for first 3 agents
                         KeyCode::Char('w') => {
-                            app.cycle_usage_window();
-                            app.refresh();
+                            if installed.len() >= 1 {
+                                app.active_tab = 1;
+                            }
+                        }
+                        KeyCode::Char('e') => {
+                            if installed.len() >= 2 {
+                                app.active_tab = 2;
+                            }
+                        }
+                        KeyCode::Char('r') => {
+                            if installed.len() >= 3 {
+                                app.active_tab = 3;
+                            }
                         }
                         KeyCode::Char(' ') => {
                             app.toggle_keepalive();
@@ -212,7 +281,18 @@ fn draw(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     // Tabs
-    let titles: Vec<Line> = TAB_NAMES
+    let tab_names = app.tab_names();
+    let tab_count = tab_names.len();
+    let last_tab = if tab_count > 0 { tab_count - 1 } else { 0 };
+
+    // Safety: clamp active_tab to valid range (must happen before borrowing app further)
+    if tab_count > 0 && app.active_tab >= tab_count {
+        app.active_tab = tab_count - 1;
+    }
+
+    let installed = app.installed_agents();
+
+    let titles: Vec<Line> = tab_names
         .iter()
         .enumerate()
         .map(|(i, t)| {
@@ -236,46 +316,98 @@ fn draw(f: &mut Frame, app: &mut App) {
     f.render_widget(tabs, chunks[0]);
 
     // Content
-    match app.active_tab {
-        0 => draw_dashboard(f, app, chunks[1]),
-        1 => draw_sessions(f, app, chunks[1]),
-        2 => draw_usage(f, app, chunks[1]),
-        3 => draw_keepalive(f, app, chunks[1]),
-        _ => {}
+    if app.active_tab == 0 {
+        draw_dashboard(f, app, chunks[1]);
+    } else if app.active_tab == last_tab {
+        draw_keepalive(f, app, chunks[1]);
+    } else if app.active_tab == last_tab - 1 {
+        draw_proxy_tab(f, &app.proxy, chunks[1]);
+    } else {
+        // Agent tab
+        let agent_idx = app.active_tab - 1;
+        if agent_idx < installed.len() {
+            let agent = installed[agent_idx];
+            if let Some(all_idx) = app.agents.iter().position(|a| a.agent_type == agent.agent_type) {
+                let sessions = app.agent_sessions.get(all_idx).cloned().unwrap_or_default();
+                let usage_5h = app.agent_usage_5h.get(all_idx).cloned();
+                let usage_1w = app.agent_usage_1w.get(all_idx).cloned();
+                draw_agent_tab(f, agent, &sessions, usage_5h.as_ref(), usage_1w.as_ref(), chunks[1]);
+            }
+        }
     }
 
     // Status bar
     let refresh_ago = app.last_refresh.elapsed().as_secs();
+    let agent_hint = if !installed.is_empty() {
+        format!(" 1:Dash {}:Agents 0:KA", installed.len().min(9).to_string())
+    } else {
+        " 1:Dash 0:KA".to_string()
+    };
     let status = format!(
-        " q:Quit  ←→:Tab  r:Refresh  w:Window  Space:Toggle  │  Last refresh: {}s ago  Window: {}",
-        refresh_ago, app.usage_window
+        " q:Quit ←→:Tab{} │ Last refresh: {}s ago",
+        agent_hint, refresh_ago,
     );
     let status_bar = Paragraph::new(status)
         .style(Style::default().fg(Color::DarkGray));
     f.render_widget(status_bar, chunks[2]);
 }
 
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+
 fn draw_dashboard(f: &mut Frame, app: &App, area: Rect) {
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(area);
+    let layout = dashboard_layout(area);
 
-    let left_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(12), Constraint::Min(5)])
-        .split(h_chunks[0]);
+    draw_system_status(f, app, layout.system);
+    draw_network(f, app, layout.network);
+    draw_agents_summary(f, app, layout.agents);
+    draw_usage_mini(f, app, layout.usage);
+}
 
-    draw_system_status(f, app, left_chunks[0]);
-    draw_agents(f, app, left_chunks[1]);
+fn dashboard_layout(area: Rect) -> DashboardLayout {
+    if area.width < MIN_DASHBOARD_WIDTH_FOR_SIDE_BY_SIDE_AGENTS {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(12),
+                Constraint::Length(6),
+                Constraint::Min(5),
+            ])
+            .split(area);
 
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(10), Constraint::Min(0)])
-        .split(h_chunks[1]);
+        let top = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(rows[0]);
 
-    draw_network(f, app, right_chunks[0]);
-    draw_usage_mini(f, app, right_chunks[1]);
+        DashboardLayout {
+            system: top[0],
+            network: top[1],
+            agents: rows[1],
+            usage: rows[2],
+        }
+    } else {
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
+
+        let left = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(12), Constraint::Min(5)])
+            .split(columns[0]);
+
+        let right = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(10), Constraint::Min(0)])
+            .split(columns[1]);
+
+        DashboardLayout {
+            system: left[0],
+            agents: left[1],
+            network: right[0],
+            usage: right[1],
+        }
+    }
 }
 
 fn draw_system_status(f: &mut Frame, app: &App, area: Rect) {
@@ -308,20 +440,19 @@ fn draw_system_status(f: &mut Frame, app: &App, area: Rect) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // CPU gauge
-            Constraint::Length(1), // CPU label
-            Constraint::Length(1), // spacer
-            Constraint::Length(1), // RAM gauge
-            Constraint::Length(1), // RAM label
-            Constraint::Length(1), // spacer
-            Constraint::Length(1), // uptime
-            Constraint::Length(1), // user
-            Constraint::Length(1), // host
-            Constraint::Length(1), // network
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
         ])
         .split(inner);
 
-    // CPU gauge
     let cpu_gauge = Gauge::default()
         .gauge_style(Style::default().fg(cpu_color))
         .ratio(cpu_pct as f64 / 100.0);
@@ -334,7 +465,6 @@ fn draw_system_status(f: &mut Frame, app: &App, area: Rect) {
     .style(Style::default().fg(Color::White));
     f.render_widget(cpu_label, rows[1]);
 
-    // RAM gauge
     let ram_gauge = Gauge::default()
         .gauge_style(Style::default().fg(ram_color))
         .ratio(ram_pct as f64 / 100.0);
@@ -413,7 +543,7 @@ fn draw_network(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(p, inner);
 }
 
-fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
+fn draw_agents_summary(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" Agents ");
@@ -476,22 +606,144 @@ fn draw_agents(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(table, inner);
 }
 
-fn draw_sessions(f: &mut Frame, app: &App, area: Rect) {
+// ─── Agent Tab (per-agent detail view) ───────────────────────────────────────
+
+fn draw_agent_tab(
+    f: &mut Frame,
+    agent: &AgentInfo,
+    sessions: &[Session],
+    usage_5h: Option<&UsageStats>,
+    usage_1w: Option<&UsageStats>,
+    area: Rect,
+) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(5), // agent header
+            Constraint::Length(5), // usage row
+            Constraint::Min(6),   // sessions
+        ])
+        .split(area);
+
+    // ── Agent Header ──
+    draw_agent_header(f, agent, chunks[0]);
+
+    // ── Usage: 5h + 1w side by side ──
+    draw_agent_usage_row(f, usage_5h, usage_1w, chunks[1]);
+
+    // ── Sessions table ──
+    draw_agent_sessions(f, agent, sessions, chunks[2]);
+}
+
+fn draw_agent_header(f: &mut Frame, agent: &AgentInfo, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" Active Sessions ");
+        .title(format!(" {} ", agent.name));
 
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    if app.sessions.is_empty() {
-        let p = Paragraph::new("No active sessions").style(Style::default().fg(Color::DarkGray));
+    let status_icon = if agent.running { "●" } else { "○" };
+    let status_color = if agent.running { Color::Green } else { Color::DarkGray };
+    let status_text = if agent.running {
+        let mut parts = Vec::new();
+        if agent.cli_sessions > 0 {
+            parts.push(format!("{} CLI", agent.cli_sessions));
+        }
+        if agent.gui_sessions > 0 {
+            parts.push(format!("{} GUI", agent.gui_sessions));
+        }
+        format!("Running — {} active ({})", agent.active_sessions, parts.join(", "))
+    } else if agent.installed {
+        "Installed — Not Running".to_string()
+    } else {
+        "Not Found".to_string()
+    };
+
+    let cli_v = agent.cli_version.as_deref().unwrap_or("—");
+    let gui_v = agent.gui_version.as_deref().unwrap_or("—");
+
+    let lines = vec![
+        Line::from(vec![
+            Span::styled(format!(" {} ", status_icon), Style::default().fg(status_color)),
+            Span::styled(status_text, Style::default().fg(status_color)),
+        ]),
+        Line::from(vec![
+            Span::raw(" CLI: "),
+            Span::styled(cli_v, Style::default().fg(Color::Cyan)),
+            Span::raw("   GUI: "),
+            Span::styled(gui_v, Style::default().fg(Color::Magenta)),
+        ]),
+    ];
+
+    let p = Paragraph::new(lines);
+    f.render_widget(p, inner);
+}
+
+fn draw_agent_usage_row(
+    f: &mut Frame,
+    usage_5h: Option<&UsageStats>,
+    usage_1w: Option<&UsageStats>,
+    area: Rect,
+) {
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    draw_usage_card(f, "5 Hours", usage_5h, columns[0]);
+    draw_usage_card(f, "1 Week", usage_1w, columns[1]);
+}
+
+fn draw_usage_card(f: &mut Frame, label: &str, usage: Option<&UsageStats>, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" Usage ({}) ", label));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if let Some(u) = usage {
+        let lines = vec![
+            Line::from(vec![
+                Span::raw(" Interactions: "),
+                Span::styled(
+                    format_number(u.total_interactions),
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(vec![
+                Span::raw(" Sessions:     "),
+                Span::styled(
+                    u.total_sessions.to_string(),
+                    Style::default().fg(Color::Cyan),
+                ),
+            ]),
+        ];
+        let p = Paragraph::new(lines);
+        f.render_widget(p, inner);
+    } else {
+        let p = Paragraph::new(" No data").style(Style::default().fg(Color::DarkGray));
+        f.render_widget(p, inner);
+    }
+}
+
+fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], area: Rect) {
+    let title = format!(" Active Sessions — {} ", agent.name);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(title);
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if sessions.is_empty() {
+        let p = Paragraph::new(" No active sessions").style(Style::default().fg(Color::DarkGray));
         f.render_widget(p, inner);
         return;
     }
 
-    let rows: Vec<Row> = app
-        .sessions
+    let rows: Vec<Row> = sessions
         .iter()
         .map(|s| {
             let status_style = match s.status.as_str() {
@@ -499,17 +751,6 @@ fn draw_sessions(f: &mut Frame, app: &App, area: Rect) {
                 "idle" | "completed" => Style::default().fg(Color::Green),
                 _ => Style::default().fg(Color::Yellow),
             };
-            let cwd = s.working_dir.as_deref().unwrap_or("—");
-            let cwd_short = if cwd.len() > 30 {
-                format!("…{}", &cwd[cwd.len() - 29..])
-            } else {
-                cwd.to_string()
-            };
-            let time = s
-                .started_at
-                .as_deref()
-                .map(relative_time)
-                .unwrap_or_default();
 
             let ep = if s.entrypoint.is_empty() { "—" } else { &s.entrypoint };
             let ep_style = match ep {
@@ -518,115 +759,74 @@ fn draw_sessions(f: &mut Frame, app: &App, area: Rect) {
                 _ => Style::default().fg(Color::DarkGray),
             };
 
+            // Truncate session ID from the front to show the unique suffix
+            let sid = if s.id.is_empty() {
+                "—".to_string()
+            } else {
+                truncate_id(&s.id, 22)
+            };
+
+            // Working dir: show tail with more space
+            let cwd = s.working_dir.as_deref().unwrap_or("—");
+            let cwd_display = if cwd.is_empty() {
+                "—".to_string()
+            } else {
+                shorten_path(cwd)
+            };
+
+            let status_text = if s.status.is_empty() { "—" } else { &s.status };
+
+            let time = s
+                .started_at
+                .as_deref()
+                .map(relative_time)
+                .unwrap_or_default();
+
             Row::new(vec![
-                Cell::from(s.agent.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
-                Cell::from(s.id.chars().take(18).collect::<String>()),
+                Cell::from(sid),
                 Cell::from(ep).style(ep_style),
-                Cell::from(s.status.as_str()).style(status_style),
-                Cell::from(cwd_short),
+                Cell::from(status_text).style(status_style),
+                Cell::from(cwd_display),
                 Cell::from(time).style(Style::default().fg(Color::DarkGray)),
             ])
         })
         .collect();
 
+    // Responsive widths: session ID fixed, mode+status compact, working dir gets the bulk
     let widths = [
-        Constraint::Length(14),
-        Constraint::Length(20),
-        Constraint::Length(8),
-        Constraint::Length(10),
-        Constraint::Min(18),
-        Constraint::Length(8),
+        Constraint::Length(24),  // Session ID
+        Constraint::Length(8),   // Mode
+        Constraint::Length(10),  // Status
+        Constraint::Min(16),    // Working Dir (flexible, gets remaining space)
+        Constraint::Length(8),   // Time
     ];
 
     let table = Table::new(rows, widths).header(
-        Row::new(vec!["Agent", "Session", "Mode", "Status", "Working Dir", "Time"])
+        Row::new(vec!["Session", "Mode", "Status", "Working Dir", "Time"])
             .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
     );
     f.render_widget(table, inner);
 }
 
-fn draw_usage(f: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(5)])
-        .split(area);
-
-    // Window selector
-    let window_label = format!(" Window: {} (press 'w' to cycle) ", app.usage_window);
-    let tabs = Tabs::new(vec![
-        Line::from(" 5 Hours "),
-        Line::from(" 1 Week "),
-        Line::from(" 1 Month "),
-    ])
-    .block(Block::default().borders(Borders::ALL).title(window_label))
-    .select(match app.usage_window.as_str() {
-        "5h" => 0,
-        "1w" => 1,
-        "1m" => 2,
-        _ => 0,
-    })
-    .style(Style::default().fg(Color::White))
-    .highlight_style(Style::default().fg(Color::Cyan));
-    f.render_widget(tabs, chunks[0]);
-
-    // Usage content
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Usage Statistics ");
-
-    let inner = block.inner(chunks[1]);
-    f.render_widget(block, chunks[1]);
-
-    if app.usage.is_empty() {
-        let p = Paragraph::new("No usage data").style(Style::default().fg(Color::DarkGray));
-        f.render_widget(p, inner);
-        return;
-    }
-
-    // Table view
-    let rows: Vec<Row> = app
-        .usage
-        .iter()
-        .map(|u| {
-            Row::new(vec![
-                Cell::from(u.agent.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
-                Cell::from(u.total_sessions.to_string()).style(Style::default().fg(Color::Cyan)),
-                Cell::from(format_number(u.total_interactions)).style(Style::default().fg(Color::Cyan)),
-            ])
-        })
-        .collect();
-
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(14),
-            Constraint::Length(12),
-            Constraint::Min(14),
-        ],
-    )
-    .header(
-        Row::new(vec!["Agent", "Sessions", "Interactions"])
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
-    );
-    f.render_widget(table, inner);
-}
+// ─── Usage (legacy full-page, used by dashboard mini) ───────────────────────
 
 fn draw_usage_mini(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" Usage ({}) ", app.usage_window));
+        .title(" Usage ");
 
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    if app.usage.is_empty() {
+    // Collect all usage
+    let all_usage: Vec<&UsageStats> = app.agent_usage_5h.iter().collect();
+    if all_usage.is_empty() {
         let p = Paragraph::new("No usage data").style(Style::default().fg(Color::DarkGray));
         f.render_widget(p, inner);
         return;
     }
 
-    let bars: Vec<Bar> = app
-        .usage
+    let bars: Vec<Bar> = all_usage
         .iter()
         .enumerate()
         .map(|(i, u)| {
@@ -649,6 +849,254 @@ fn draw_usage_mini(f: &mut Frame, app: &App, area: Rect) {
         .bar_gap(1);
     f.render_widget(barchart, inner);
 }
+
+// ─── Proxy / VPN ─────────────────────────────────────────────────────────────
+
+fn draw_proxy_tab(f: &mut Frame, info: &ProxyInfo, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(7),  // system proxy
+            Constraint::Length(5),  // VPN connections
+            Constraint::Length(5),  // proxy client
+            Constraint::Min(6),    // proxy nodes
+        ])
+        .split(area);
+
+    draw_proxy_system(f, &info.system_proxy, chunks[0]);
+    draw_proxy_vpn(f, &info.vpn_connections, chunks[1]);
+    draw_proxy_client(f, &info.active_client, chunks[2]);
+    draw_proxy_nodes(f, &info.proxy_nodes, chunks[3]);
+}
+
+fn draw_proxy_system(f: &mut Frame, proxy: &crate::models::types::SystemProxy, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" System Proxy — {} ", proxy.active_service));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+        ])
+        .split(inner);
+
+    draw_proxy_entry(f, "HTTP", &proxy.http, columns[0]);
+    draw_proxy_entry(f, "HTTPS", &proxy.https, columns[1]);
+    draw_proxy_entry_socks(f, "SOCKS", &proxy.socks, columns[2]);
+
+    // PAC
+    let pac_lines = if let Some(ref url) = proxy.pac {
+        vec![
+            Line::from(Span::styled(" PAC", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(
+                truncate_str(url, 22),
+                Style::default().fg(Color::Cyan),
+            )),
+        ]
+    } else {
+        vec![
+            Line::from(Span::styled(" PAC", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(" Off", Style::default().fg(Color::DarkGray))),
+        ]
+    };
+    let pac_block = Block::default().borders(Borders::RIGHT);
+    let pac_inner = pac_block.inner(columns[3]);
+    f.render_widget(pac_block, columns[3]);
+    f.render_widget(Paragraph::new(pac_lines), pac_inner);
+}
+
+fn draw_proxy_entry(f: &mut Frame, label: &str, entry: &crate::models::types::ProxyEntry, area: Rect) {
+    let lines = if entry.enabled {
+        vec![
+            Line::from(Span::styled(
+                format!(" {}", label),
+                Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::styled(
+                format!(" {}:{}", entry.server, entry.port),
+                Style::default().fg(Color::Green),
+            )),
+        ]
+    } else {
+        vec![
+            Line::from(Span::styled(
+                format!(" {}", label),
+                Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::styled(" Off", Style::default().fg(Color::DarkGray))),
+        ]
+    };
+    let block = Block::default().borders(Borders::RIGHT);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    f.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_proxy_entry_socks(f: &mut Frame, label: &str, entry: &crate::models::types::ProxyEntry, area: Rect) {
+    draw_proxy_entry(f, label, entry, area);
+}
+
+fn draw_proxy_vpn(f: &mut Frame, vpns: &[crate::models::types::VpnConnection], area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" VPN ");
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if vpns.is_empty() {
+        f.render_widget(
+            Paragraph::new(" No VPN connections detected").style(Style::default().fg(Color::DarkGray)),
+            inner,
+        );
+        return;
+    }
+
+    let rows: Vec<Row> = vpns
+        .iter()
+        .map(|v| {
+            let status_icon = if v.connected { "●" } else { "○" };
+            let status_color = if v.connected { Color::Green } else { Color::DarkGray };
+            let state_text = if v.connected { "Connected" } else { "Disconnected" };
+
+            Row::new(vec![
+                Cell::from(status_icon).style(Style::default().fg(status_color)),
+                Cell::from(v.name.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
+                Cell::from(v.vpn_type.as_str()).style(Style::default().fg(Color::DarkGray)),
+                Cell::from(state_text).style(Style::default().fg(status_color)),
+            ])
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(2),
+            Constraint::Min(16),
+            Constraint::Length(10),
+            Constraint::Length(14),
+        ],
+    );
+    f.render_widget(table, inner);
+}
+
+fn draw_proxy_client(f: &mut Frame, client: &Option<crate::models::types::ProxyClient>, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Proxy Client ");
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if let Some(c) = client {
+        let mut lines = vec![Line::from(vec![
+            Span::styled(format!(" {} ", c.name), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::raw("  "),
+            Span::styled(c.client_type.to_uppercase(), Style::default().fg(Color::DarkGray)),
+        ])];
+        let mut detail_parts = vec![format!("port: {}", c.api_port)];
+        if let Some(ref v) = c.version {
+            detail_parts.push(format!("v{}", v));
+        }
+        if let Some(ref m) = c.mode {
+            detail_parts.push(format!("mode: {}", m));
+        }
+        lines.push(Line::from(Span::styled(
+            format!(" {}", detail_parts.join("  │  ")),
+            Style::default().fg(Color::Gray),
+        )));
+        f.render_widget(Paragraph::new(lines), inner);
+    } else {
+        f.render_widget(
+            Paragraph::new(" No proxy client detected").style(Style::default().fg(Color::DarkGray)),
+            inner,
+        );
+    }
+}
+
+fn draw_proxy_nodes(f: &mut Frame, nodes: &[crate::models::types::ProxyNode], area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Proxy Nodes ");
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if nodes.is_empty() {
+        f.render_widget(
+            Paragraph::new(" No proxy nodes available").style(Style::default().fg(Color::DarkGray)),
+            inner,
+        );
+        return;
+    }
+
+    let rows: Vec<Row> = nodes
+        .iter()
+        .map(|n| {
+            let delay_str = n
+                .delay
+                .map(|d| {
+                    if d >= 1000 {
+                        format!("{}.{:01}s", d / 1000, (d % 1000) / 100)
+                    } else {
+                        format!("{}ms", d)
+                    }
+                })
+                .unwrap_or_else(|| "—".to_string());
+
+            let delay_color = match n.delay {
+                Some(d) if d <= 100 => Color::Green,
+                Some(d) if d <= 300 => Color::Yellow,
+                Some(_) => Color::Red,
+                None => Color::DarkGray,
+            };
+
+            Row::new(vec![
+                Cell::from(n.name.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
+                Cell::from(n.node_type.as_str()).style(Style::default().fg(Color::DarkGray)),
+                Cell::from(n.selected.as_str()).style(Style::default().fg(Color::Cyan)),
+                Cell::from(delay_str).style(Style::default().fg(delay_color)),
+                Cell::from(format!("{} nodes", n.available_nodes.len()))
+                    .style(Style::default().fg(Color::DarkGray)),
+            ])
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(18),
+            Constraint::Length(10),
+            Constraint::Min(18),
+            Constraint::Length(8),
+            Constraint::Length(10),
+        ],
+    )
+    .header(
+        Row::new(vec!["Group", "Type", "Selected", "Delay", "Nodes"])
+            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+    );
+    f.render_widget(table, inner);
+}
+
+fn truncate_str(s: &str, max_chars: usize) -> String {
+    let char_count = s.chars().count();
+    if char_count <= max_chars {
+        s.to_string()
+    } else {
+        let tail: String = s.chars().skip(char_count - max_chars + 1).collect();
+        format!("…{}", tail)
+    }
+}
+
+// ─── Keep-Alive ──────────────────────────────────────────────────────────────
 
 fn draw_keepalive(f: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
@@ -765,6 +1213,39 @@ fn draw_keepalive(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(table, controls_inner);
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Truncate a session ID to `max_len` chars, keeping the right (unique) part
+fn truncate_id(id: &str, max_len: usize) -> String {
+    let char_count = id.chars().count();
+    if char_count <= max_len {
+        id.to_string()
+    } else {
+        let skip = char_count - max_len + 1; // +1 for the '…' prefix
+        let tail: String = id.chars().skip(skip).collect();
+        format!("…{}", tail)
+    }
+}
+
+/// Shorten a path by replacing the middle with …, keeping the tail.
+/// Uses char-based operations to avoid panicking on multi-byte UTF-8.
+fn shorten_path(path: &str) -> String {
+    let char_count = path.chars().count();
+    if char_count <= 32 {
+        return path.to_string();
+    }
+    // Keep the last ~28 chars
+    let tail_chars = 28;
+    if char_count <= tail_chars + 2 {
+        return path.to_string();
+    }
+    let tail: String = path.chars().skip(char_count - tail_chars).collect();
+    // Find the first / in tail to keep it clean
+    let offset = tail.find('/').unwrap_or(0);
+    // offset is a byte index into `tail` which is ASCII-ish (paths), safe to slice
+    format!("…{}", &tail[offset..])
+}
+
 #[allow(dead_code)]
 fn format_bytes(bytes: u64) -> String {
     if bytes >= 1_073_741_824 {
@@ -814,5 +1295,57 @@ fn relative_time(iso: &str) -> String {
         format!("{}h", mins / 60)
     } else {
         format!("{}d", mins / 1440)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dashboard_layout_gives_agents_full_width_on_narrow_terminals() {
+        let area = Rect::new(0, 0, 80, 20);
+        let layout = dashboard_layout(area);
+
+        assert_eq!(layout.agents.x, area.x);
+        assert_eq!(layout.agents.width, area.width);
+    }
+
+    #[test]
+    fn dashboard_layout_keeps_side_by_side_panels_on_wide_terminals() {
+        let area = Rect::new(0, 0, 180, 24);
+        let layout = dashboard_layout(area);
+
+        assert_eq!(layout.agents.x, layout.system.x);
+        assert!(layout.agents.width < area.width);
+        assert_eq!(layout.usage.x, layout.network.x);
+    }
+
+    #[test]
+    fn truncate_id_short_ids_unchanged() {
+        assert_eq!(truncate_id("abc", 10), "abc");
+        assert_eq!(truncate_id("1234567890", 10), "1234567890");
+    }
+
+    #[test]
+    fn truncate_id_long_ids_keep_right() {
+        let result = truncate_id("abcdefghijklmnop", 8);
+        assert!(result.starts_with("…"));
+        // Use chars().count() since '…' is multi-byte UTF-8
+        assert!(result.chars().count() <= 8, "expected <= 8 chars, got {}: {}", result.chars().count(), result);
+        assert!(result.ends_with("mnop"));
+    }
+
+    #[test]
+    fn shorten_path_short_unchanged() {
+        assert_eq!(shorten_path("/tmp/test"), "/tmp/test");
+    }
+
+    #[test]
+    fn shorten_path_long_path_truncated() {
+        let path = "/Users/developer/projects/my-app/src/components/very-long-name.tsx";
+        let result = shorten_path(path);
+        assert!(result.starts_with("…"));
+        assert!(result.len() < path.len());
     }
 }

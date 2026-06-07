@@ -3,21 +3,33 @@
   import { onMount, onDestroy } from "svelte";
   import SystemStatus from "$lib/components/SystemStatus.svelte";
   import NetworkInfo from "$lib/components/NetworkInfo.svelte";
-  import AgentCard from "$lib/components/AgentCard.svelte";
-  import SessionList from "$lib/components/SessionList.svelte";
-  import UsageChart from "$lib/components/UsageChart.svelte";
+  import AgentTab from "$lib/components/AgentTab.svelte";
+  import ProxyInfo from "$lib/components/ProxyInfo.svelte";
   import KeepAlive from "$lib/components/KeepAlive.svelte";
 
   let systemStatus = $state(null);
   let networkInfo = $state(null);
   let agents = $state([]);
-  let sessions = $state([]);
-  let usageWindow = $state("5h");
-  let usageStats = $state([]);
   let keepAliveStatus = $state(null);
+  let activeTab = $state(0);
 
   let pollInterval;
   let networkLoaded = false;
+
+  // Only show tabs for installed agents
+  const availableAgents = $derived(agents.filter((a) => a.installed));
+
+  // Build tab list: agent tabs + proxy tab
+  const tabs = $derived(() => {
+    const list = availableAgents.map((a, i) => ({
+      kind: "agent",
+      label: a.name,
+      running: a.running,
+      index: i,
+    }));
+    list.push({ kind: "proxy", label: "Proxy / VPN", running: false, index: list.length });
+    return list;
+  });
 
   async function fetchSystem() {
     try {
@@ -32,23 +44,6 @@
       agents = await invoke("get_agents");
     } catch (e) {
       console.error("Failed to fetch agents:", e);
-    }
-  }
-
-  async function fetchSessions() {
-    try {
-      // Fetch sessions for each agent individually
-      const allSessions = [];
-      const agentNames = ["claude", "cursor", "codex"];
-      for (const name of agentNames) {
-        try {
-          const s = await invoke("get_agent_sessions", { agent: name });
-          allSessions.push(...s);
-        } catch (_) { /* agent may not be installed */ }
-      }
-      sessions = allSessions;
-    } catch (e) {
-      console.error("Failed to fetch sessions:", e);
     }
   }
 
@@ -70,35 +65,16 @@
     }
   }
 
-  async function fetchUsage() {
-    if (agents.length === 0) return;
-    try {
-      const allUsage = [];
-      for (const agent of agents) {
-        try {
-          const u = await invoke("get_agent_usage", {
-            agent: agent.name,
-            window: usageWindow,
-          });
-          allUsage.push(u);
-        } catch (_) { /* skip */ }
-      }
-      usageStats = allUsage;
-    } catch (e) {
-      console.error("Failed to fetch usage:", e);
-    }
-  }
-
   async function fetchAll() {
-    await Promise.all([fetchSystem(), fetchAgents(), fetchSessions(), fetchKeepAlive()]);
+    await Promise.all([fetchSystem(), fetchAgents(), fetchKeepAlive()]);
   }
 
-  // Fetch usage whenever agents or window changes
+  // Clamp active tab when tabs change
   $effect(() => {
-    // Access reactive deps
-    const _ = agents;
-    const __ = usageWindow;
-    fetchUsage();
+    const count = tabs().length;
+    if (count > 0 && activeTab >= count) {
+      activeTab = count - 1;
+    }
   });
 
   onMount(() => {
@@ -130,44 +106,38 @@
     </section>
   </div>
 
-  <section class="card agents-section">
-    <h2>Agents</h2>
-    <div class="agent-grid">
-      {#each agents as agent (agent.name)}
-        <AgentCard {agent} />
-      {/each}
-    </div>
-  </section>
+  <!-- Tabs -->
+  {#if tabs().length > 0}
+    <section class="card tabs-section">
+      <div class="tab-bar">
+        {#each tabs() as tab, i}
+          <button
+            class="tab-btn"
+            class:active={activeTab === i}
+            onclick={() => (activeTab = i)}
+          >
+            {#if tab.kind === "agent"}
+              <span class="tab-dot" class:running={tab.running}></span>
+            {:else}
+              <span class="tab-icon">🔒</span>
+            {/if}
+            {tab.label}
+          </button>
+        {/each}
+      </div>
 
-  <section class="card usage-section">
-    <h2>Usage</h2>
-    <div class="window-tabs">
-      <button
-        class:active={usageWindow === "5h"}
-        onclick={() => (usageWindow = "5h")}
-      >
-        5 Hours
-      </button>
-      <button
-        class:active={usageWindow === "1w"}
-        onclick={() => (usageWindow = "1w")}
-      >
-        1 Week
-      </button>
-      <button
-        class:active={usageWindow === "1m"}
-        onclick={() => (usageWindow = "1m")}
-      >
-        1 Month
-      </button>
-    </div>
-    <UsageChart stats={usageStats} window={usageWindow} />
-  </section>
-
-  <section class="card sessions-section">
-    <h2>Active Sessions</h2>
-    <SessionList {sessions} />
-  </section>
+      <div class="tab-content">
+        {#if tabs()[activeTab]?.kind === "agent"}
+          {@const agentIdx = tabs()[activeTab].index}
+          {#if availableAgents[agentIdx]}
+            <AgentTab agent={availableAgents[agentIdx]} />
+          {/if}
+        {:else if tabs()[activeTab]?.kind === "proxy"}
+          <ProxyInfo />
+        {/if}
+      </div>
+    </section>
+  {/if}
 
   <section class="card keepalive-section">
     <KeepAlive status={keepAliveStatus} />
@@ -226,44 +196,59 @@
     margin-bottom: 16px;
   }
 
-  .card h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #ffffff;
-    margin-bottom: 12px;
-  }
-
-  .agent-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
-  .window-tabs {
+  .tab-bar {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #2a2a2a;
+    padding-bottom: 0;
+    overflow-x: auto;
   }
 
-  .window-tabs button {
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    color: #aaa;
-    padding: 6px 16px;
-    border-radius: 8px;
+  .tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #888;
+    font-size: 0.9rem;
+    font-weight: 500;
     cursor: pointer;
-    font-size: 0.85rem;
     transition: all 0.2s;
+    margin-bottom: -1px;
+    white-space: nowrap;
   }
 
-  .window-tabs button:hover {
-    background: #333;
-    color: #fff;
+  .tab-btn:hover {
+    color: #ccc;
   }
 
-  .window-tabs button.active {
-    background: #2563eb;
-    border-color: #2563eb;
+  .tab-btn.active {
     color: #fff;
+    border-bottom-color: #2563eb;
+  }
+
+  .tab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+    flex-shrink: 0;
+  }
+
+  .tab-dot.running {
+    background: #22c55e;
+  }
+
+  .tab-icon {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .tab-content {
+    min-height: 200px;
   }
 </style>

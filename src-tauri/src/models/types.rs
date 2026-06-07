@@ -92,3 +92,59 @@ pub struct KeepAliveStatus {
     pub expires_at: Option<String>,
     pub pid: Option<u32>,
 }
+
+/// Full proxy/VPN information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyInfo {
+    pub system_proxy: SystemProxy,
+    pub vpn_connections: Vec<VpnConnection>,
+    pub active_client: Option<ProxyClient>,
+    pub proxy_nodes: Vec<ProxyNode>,
+}
+
+/// System-level proxy configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemProxy {
+    pub active_service: String,
+    pub http: ProxyEntry,
+    pub https: ProxyEntry,
+    pub socks: ProxyEntry,
+    pub pac: Option<String>,
+    pub bypass: Vec<String>,
+}
+
+/// A single proxy entry (HTTP, HTTPS, or SOCKS)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyEntry {
+    pub enabled: bool,
+    pub server: String,
+    pub port: u16,
+}
+
+/// A VPN connection detected by the system
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VpnConnection {
+    pub name: String,
+    pub connected: bool,
+    pub vpn_type: String,
+}
+
+/// A detected proxy client (Clash, Surge, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyClient {
+    pub name: String,
+    pub client_type: String,
+    pub api_port: u16,
+    pub version: Option<String>,
+    pub mode: Option<String>,
+}
+
+/// A proxy node/group from the active client's API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyNode {
+    pub name: String,
+    pub selected: String,
+    pub delay: Option<u64>,
+    pub node_type: String,
+    pub available_nodes: Vec<String>,
+}

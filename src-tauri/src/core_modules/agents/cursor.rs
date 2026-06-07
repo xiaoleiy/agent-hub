@@ -130,19 +130,8 @@ fn get_cursor_cli_version() -> Option<String> {
         }
     }
 
-    // Fallback to cursor --version (this returns the GUI version, not ideal)
-    if let Ok(output) = std::process::Command::new("cursor")
-        .arg("--version")
-        .output()
-    {
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let first_line = stdout.lines().next().unwrap_or("").trim();
-            if !first_line.is_empty() {
-                return Some(first_line.to_string());
-            }
-        }
-    }
+    // Do NOT fall back to `cursor --version` — that returns the GUI version (e.g. "3.7.12"),
+    // not the CLI version (e.g. "2026.06.04-5fd875e"). Return None instead.
     None
 }
 
@@ -254,13 +243,14 @@ mod tests {
     #[test]
     fn test_cursor_agent_version_format() {
         let version = get_cursor_cli_version();
-        assert!(version.is_some(), "cursor-agent --version should return a value");
-        let v = version.unwrap();
-        // Should be a date-based version like "2026.06.04-5fd875e"
-        assert!(v.contains('.'), "version should contain dots: {}", v);
-        assert!(!v.contains('\n'), "version should not contain newlines: {}", v);
-        // Should NOT be the GUI version "3.7.12"
-        assert_ne!(v, "3.7.12", "CLI version should not be the GUI version");
+        if let Some(v) = version {
+            // Should be a date-based version like "2026.06.04-5fd875e"
+            assert!(v.contains('.'), "version should contain dots: {}", v);
+            assert!(!v.contains('\n'), "version should not contain newlines: {}", v);
+            // Should NOT be the GUI version "3.7.12"
+            assert_ne!(v, "3.7.12", "CLI version should not be the GUI version");
+        }
+        // If cursor-agent is not installed, None is acceptable
     }
 
     #[test]
@@ -276,13 +266,14 @@ mod tests {
     #[test]
     fn test_cursor_cli_version_is_date_based() {
         let cli = get_cursor_cli_version();
-        assert!(cli.is_some(), "cursor CLI version should be available");
-        let v = cli.unwrap();
-        // CLI version should be date-based like "2026.06.04-5fd875e", not semver like "3.7.12"
-        assert!(v.contains('-') && v.contains('.'),
-            "CLI version should be date-based (YYYY.MM.DD-hash), got: {}", v);
-        // Should NOT be the GUI semver version
-        assert_ne!(v, "3.7.12", "CLI version should not be the GUI version 3.7.12, got: {}", v);
+        if let Some(v) = cli {
+            // CLI version should be date-based like "2026.06.04-5fd875e", not semver like "3.7.12"
+            assert!(v.contains('-') && v.contains('.'),
+                "CLI version should be date-based (YYYY.MM.DD-hash), got: {}", v);
+            // Should NOT be the GUI semver version
+            assert_ne!(v, "3.7.12", "CLI version should not be the GUI version 3.7.12, got: {}", v);
+        }
+        // If cursor-agent is not installed, None is acceptable
     }
 
     #[test]
@@ -293,6 +284,10 @@ mod tests {
         // CLI version should not be the GUI version
         if let Some(cv) = &info.cli_version {
             assert_ne!(cv, "3.7.12", "cli_version should not be GUI version 3.7.12");
+        }
+        // GUI version should be available if Cursor.app exists
+        if PathBuf::from("/Applications/Cursor.app").exists() {
+            assert!(info.gui_version.is_some(), "GUI version should be set when Cursor.app exists");
         }
     }
 

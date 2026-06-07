@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "bugs": [
+    {
+      "id": "bug-001",
+      "timestamp": "2026-06-07T23:30:00Z",
+      "error_message": "TUI Agents table shows Cursor CLI Ver as '3.7.12' (GUI version) instead of '2026.06.04-5fd875e' (CLI version)",
+      "file": "src-tauri/src/core_modules/agents/cursor.rs",
+      "root_cause": "get_cursor_cli_version() fell back to `cursor --version` which returns the GUI version, not the CLI version. `cursor-agent --version` is the correct CLI binary.",
+      "fix": "Removed the `cursor --version` fallback entirely. Now only uses `cursor-agent --version`. Returns None if not found.",
+      "tags": ["cursor", "version", "tui", "gui"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-07"
+    },
+    {
+      "id": "bug-002",
+      "timestamp": "2026-06-07T23:45:00Z",
+      "error_message": "thread 'main' panicked at src/tui/mod.rs:971:27: start byte index 123 is not a char boundary; it is inside '包' (bytes 121..124 of string)",
+      "file": "src-tauri/src/tui/mod.rs",
+      "root_cause": "shorten_path() used byte-level string slicing (&path[path.len() - 28..]) which panics when the slice boundary falls inside a multi-byte UTF-8 character (Chinese chars are 3 bytes each).",
+      "fix": "Changed both shorten_path() and truncate_id() to use char-based operations: chars().skip(n).collect::<String>() instead of byte indexing.",
+      "tags": ["tui", "utf-8", "panic", "unicode", "chinese"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-07"
+    },
+    {
+      "id": "bug-003",
+      "timestamp": "2026-06-07T23:50:00Z",
+      "error_message": "TUI crashes when switching tabs after agent list changes (e.g., Codex tab crash)",
+      "file": "src-tauri/src/tui/mod.rs",
+      "root_cause": "After refresh() updates self.agents, active_tab could exceed the new tab count if installed agents changed. The Tabs widget panics when .select(index) >= tab count.",
+      "fix": "Added active_tab clamping in both refresh() (after agents update) and draw() (before rendering). Belt-and-suspenders approach.",
+      "tags": ["tui", "crash", "tab", "index-out-of-bounds"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-07"
+    },
+    {
+      "id": "bug-004",
+      "timestamp": "2026-06-07T23:55:00Z",
+      "error_message": "Proxy/VPN tab added to GUI but missing from TUI",
+      "file": "src-tauri/src/tui/mod.rs",
+      "root_cause": "Forgot to add the Proxy/VPN tab to the TUI when implementing the GUI version. User expected both interfaces to stay in sync.",
+      "fix": "Added draw_proxy_tab() with sub-sections: system proxy, VPN connections, proxy client, proxy nodes. Registered in tab routing between agent tabs and Keep-Alive.",
+      "tags": ["tui", "feature-parity", "proxy", "vpn"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-07"
+    }
+  ]
+}
