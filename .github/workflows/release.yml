@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            target: x86_64-apple-darwin
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "Agent Hub v__VERSION__"
+          releaseBody: |
+            ## Agent Hub v__VERSION__
+
+            Manage AI coding agents (Claude Code, Cursor, Codex) on your macOS machine.
+
+            ### Install via Homebrew
+            ```bash
+            brew tap xiaoleiy/tap
+            brew install --cask xiaoleiy/tap/agent-hub
+            ```
+
+            ### CLI Usage
+            ```bash
+            agent-hub status        # System status
+            agent-hub agents        # List agents
+            agent-hub sessions      # Active sessions
+            agent-hub usage         # Usage stats
+            agent-hub keepalive 1h  # Prevent sleep for 1 hour
+            ```
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  update-tap:
+    needs: build
+    runs-on: macos-latest
+    if: "!github.event.release.prerelease"
+    steps:
+      - name: Update Homebrew Tap
+        run: |
+          echo "TODO: Auto-update homebrew tap with new version SHA256"
+          # This would clone xiaoleiy/homebrew-tap, update Casks/agent-hub.rb
+          # with the new version and SHA256 from the release artifacts,
+          # then commit and push.
