@@ -25,7 +25,6 @@ pub fn detect() -> AgentInfo {
     let mut cli_sessions = 0usize;
     let mut gui_sessions = 0usize;
     let mut running = false;
-    let mut cli_version: Option<String> = None;
     let mut gui_version: Option<String> = None;
 
     if sessions.exists() {
@@ -40,27 +39,18 @@ pub fn detect() -> AgentInfo {
                                 _ => gui_sessions += 1,
                             }
                         }
-                        // Track latest version per entrypoint type
-                        if !sess.version.is_empty() {
-                            match sess.entrypoint.as_str() {
-                                "cli" => {
-                                    cli_version = Some(sess.version.clone());
-                                }
-                                "sdk-cli" => {
-                                    if cli_version.is_none() {
-                                        cli_version = Some(sess.version.clone());
-                                    }
-                                }
-                                _ => {
-                                    gui_version = Some(sess.version.clone());
-                                }
-                            }
+                        // Track GUI version from session files
+                        if !sess.version.is_empty() && sess.entrypoint != "cli" && sess.entrypoint != "sdk-cli" {
+                            gui_version = Some(sess.version.clone());
                         }
                     }
                 }
             }
         }
     }
+
+    // Get CLI version from the binary itself (more accurate than session files)
+    let cli_version = get_claude_cli_version();
 
     let version = match (&cli_version, &gui_version) {
         (Some(cv), Some(gv)) if cv != gv => Some(format!("CLI {} / GUI {}", cv, gv)),
@@ -95,6 +85,30 @@ fn which_claude() -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+fn get_claude_cli_version() -> Option<String> {
+    let claude_bin = home().join(".local/bin/claude");
+    let cmd = if claude_bin.exists() {
+        claude_bin.to_string_lossy().to_string()
+    } else {
+        "claude".to_string()
+    };
+    if let Ok(output) = std::process::Command::new(&cmd)
+        .arg("-v")
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Output is like "2.1.168 (Claude Code)" — take just the version part
+            let raw = stdout.lines().next().unwrap_or("").trim();
+            let version = raw.split_whitespace().next().unwrap_or(raw);
+            if !version.is_empty() {
+                return Some(version.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn is_pid_alive(pid: u32) -> bool {
