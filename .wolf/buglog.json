@@ -580,6 +580,163 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-08T08:57:17.716Z"
+    },
+    {
+      "id": "bug-035",
+      "timestamp": "2026-06-08T21:40:00.000Z",
+      "error_message": "GUI window is blank when launched via `cargo run -- gui` and clicking the menu-bar tray icon",
+      "file": "build/ (Tauri frontendDist, gitignored)",
+      "root_cause": "build/index.html referenced /_app/immutable/entry/*.js + chunks, but build/_app/ contained only version.json — the JS bundle was missing/stale (hashes didn't even match .svelte-kit/output). The webview loaded index.html, its dynamic import() 404'd, so SvelteKit never mounted -> blank. `beforeBuildCommand: npm run build` only runs under `tauri build`, NOT under plain `cargo run`/`cargo build`, so the embedded frontend was never (re)built. `cargo run -- gui` uses the embedded frontendDist (verified: webview does NOT hit devUrl:1420), so a stale/empty build/ blanks the window. Unrelated to the OpenCode agent change.",
+      "fix": "Ran `npm run build` to repopulate build/_app/immutable, then rebuilt the Rust binary (touch lib.rs so generate_context! re-embeds). tauri-build sets cargo:rerun-if-changed on frontendDist, so a fresh `cargo run -- gui` re-embeds automatically. Verified in a headless browser: bundle mounts (33 els, full shell), zero module 404s (only expected invoke-unavailable errors). For GUI-from-source always run `npm run build` first, or use `npm run tauri dev` for live reload.  [SUPERSEDED by bug-036: this npm-run-build fix was verified only over plain HTTP (no Tauri runtime) and was INSUFFICIENT — the real webview was still blank. cargo run -- gui serves a stale embedded frontend; use `tauri dev`.]",
+      "tags": [
+        "gui",
+        "tauri",
+        "blank-window",
+        "frontend-build",
+        "sveltekit",
+        "frontendDist",
+        "cargo-run"
+      ],
+      "related_bugs": [
+        "bug-036"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T21:40:00.000Z"
+    },
+    {
+      "id": "bug-036",
+      "timestamp": "2026-06-08T13:54:57.644Z",
+      "error_message": "Missing error handling in beacon",
+      "file": "src/app.html",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "html"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T13:54:57.644Z"
+    },
+    {
+      "id": "bug-037",
+      "timestamp": "2026-06-08T13:55:32.604Z",
+      "error_message": "Wrong reference: false should be true",
+      "file": "src-tauri/tauri.conf.json",
+      "root_cause": "Used \"false\" instead of \"true\"",
+      "fix": "Changed false → true",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-08T14:00:17.000Z"
+    },
+    {
+      "id": "bug-038",
+      "timestamp": "2026-06-08T14:00:26.923Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/app.html",
+      "root_cause": "15 lines replaced/restructured",
+      "fix": "Rewrote 18→3 lines (15 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "html"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T14:00:26.923Z"
+    },
+    {
+      "id": "bug-036",
+      "timestamp": "2026-06-08T22:05:00.000Z",
+      "error_message": "GUI app STILL blank after the bug-035 'npm run build' fix (user re-tested)",
+      "file": "package.json (run scripts) / Tauri frontend-embedding workflow",
+      "root_cause": "The blank is specific to launching via bare `cargo run -- gui`. Plain cargo does NOT run Tauri's frontend embed/serve pipeline the way the Tauri CLI does (beforeBuildCommand: npm run build only fires under `tauri build`; plain cargo/cargo run does not re-embed a changed build/). So the debug binary's webview serves a stale/mismatched embedded index.html whose hashed import()s 404 -> SvelteKit never mounts -> blank. The bug-035 'npm run build then cargo run' fix was only ever 'verified' by loading build/ over plain HTTP in a headless browser, which has NO Tauri runtime (invoke undefined -> caught -> empty-data shell still mounts) and therefore could not detect the real failure.",
+      "fix": "Run the GUI from source via the Tauri CLI. Changed npm scripts: `gui`=`tauri dev` (vite dev server on devUrl:1420 + app, hot reload), `gui:build`=`tauri build` (production/embedded app), `tui`=`cargo run -- tui`. VERIFIED `tauri dev` renders by injecting an inline beacon in app.html and reading it from inside the REAL webview: html-parsed -> window-load -> 't2s mounted=Agent Hub / Manage AI coding agents...'. Reverted diagnostics (app.html beacon, tauri.conf visible:true->false). Lesson: verify webview fixes in the actual webview (tauri dev + beacon), never over plain HTTP; tauri:// origin can't fetch http://localhost (mixed-content), and a hidden tray window may defer webview load until shown.",
+      "tags": [
+        "gui",
+        "tauri",
+        "blank-window",
+        "tauri-dev",
+        "cargo-run",
+        "frontend-embedding",
+        "verification",
+        "regression-of-fix"
+      ],
+      "related_bugs": [
+        "bug-035"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T22:05:00.000Z"
+    },
+    {
+      "id": "bug-040",
+      "timestamp": "2026-06-08T14:15:11.735Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/routes/+page.svelte",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 23→29 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T14:15:11.735Z"
+    },
+    {
+      "id": "bug-041",
+      "timestamp": "2026-06-08T14:15:30.953Z",
+      "error_message": "Wrong reference: 200px should be 80px",
+      "file": "src/routes/+page.svelte",
+      "root_cause": "Used \"200px\" instead of \"80px\"",
+      "fix": "Changed 200px → 80px",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T14:15:30.953Z"
+    },
+    {
+      "id": "bug-042",
+      "timestamp": "2026-06-08T14:17:36.217Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/lib/components/AgentTab.svelte",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 26→32 lines (5 removed) | Also: .sessions-section { overflow-x: auto; }; table {",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-08T14:18:09.390Z"
+    },
+    {
+      "id": "bug-043",
+      "timestamp": "2026-06-08T14:20:38.622Z",
+      "error_message": "Wrong return value",
+      "file": "src/lib/components/SystemStatus.svelte",
+      "root_cause": "Was returning: (bytesPerSec / 1048576).toFixed(2) + \" MB/s\";",
+      "fix": "Now returns: (bytesPerSec / 1048576).toFixed(1) + \" MB/s\";",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T14:20:38.622Z"
     }
   ]
 }

@@ -204,3 +204,40 @@
 | 21:19 | Edited src-tauri/src/cli/mod.rs | 3→3 lines | ~32 |
 | 21:20 | Added OpenCode as 4th agent (full parity) — verified live: v1.16.2, 3 sessions, token+model breakdown | opencode.rs + 5 wiring files | 47 tests pass, fmt+clippy clean | ~6000 |
 | 21:21 | Session end: 11 writes across 5 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 6 reads | ~17142 tok |
+| 21:33 | Session end: 11 writes across 5 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 6 reads | ~17142 tok |
+| 21:42 | Fixed blank GUI window — stale build/ (missing _app JS) → npm run build + re-embed; verified mount in headless browser | build/, lib.rs (rebuild) | window renders; bug-035 logged | ~7000 |
+| 21:42 | Session end: 11 writes across 5 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 9 reads | ~20483 tok |
+| 21:48 | Edited package.json | 3→6 lines | ~105 |
+| 21:48 | Added npm run scripts: gui (build+launch), gui:dev (tauri dev), tui | package.json | both verified working | ~600 |
+| 21:50 | Session end: 12 writes across 6 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 10 reads | ~20807 tok |
+| 21:54 | Created ../../../../tmp/ah_beacon_server.py | — | ~226 |
+| 21:54 | Edited src/app.html | added error handling | ~284 |
+| 21:55 | Edited src-tauri/tauri.conf.json | 2→2 lines | ~16 |
+| 22:00 | Edited src-tauri/tauri.conf.json | 2→2 lines | ~16 |
+| 22:00 | Edited src/app.html | removed 18 lines | ~34 |
+| 22:00 | Edited package.json | 4→4 lines | ~42 |
+| 22:06 | RE-FIX blank GUI: root cause = cargo run -- gui serves stale embedded frontend; switched npm gui->`tauri dev` (verified render via in-webview beacon), gui:build->`tauri build` | package.json, app.html(revert), tauri.conf(revert) | npm run gui renders ✓; bug-036; corrected premature bug-035 | ~9000 |
+| 22:03 | Session end: 18 writes across 9 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 12 reads | ~21688 tok |
+| 22:15 | Edited src/routes/+page.svelte | modified global() | ~148 |
+| 22:15 | Edited src/routes/+page.svelte | 47→47 lines | ~247 |
+| 22:15 | Edited src/routes/+page.svelte | 3→3 lines | ~12 |
+| 22:16 | Edited src/lib/components/AgentTab.svelte | added 1 condition(s) | ~99 |
+| 22:16 | Edited src/lib/components/AgentTab.svelte | reduced (-17 lines) | ~328 |
+| 22:16 | Edited src/lib/components/AgentTab.svelte | expanded (+6 lines) | ~330 |
+| 22:16 | Edited src/lib/components/AgentTab.svelte | 6→6 lines | ~26 |
+| 22:17 | Edited src/lib/components/AgentTab.svelte | 4→4 lines | ~21 |
+| 22:17 | Edited src/lib/components/AgentTab.svelte | 11→11 lines | ~46 |
+| 22:17 | Edited src/lib/components/AgentTab.svelte | 12→12 lines | ~56 |
+| 22:17 | Edited src/lib/components/AgentTab.svelte | 14→15 lines | ~79 |
+| 22:17 | Edited src/lib/components/AgentTab.svelte | expanded (+6 lines) | ~156 |
+| 22:18 | Edited src/lib/components/AgentTab.svelte | expanded (+25 lines) | ~494 |
+| 22:18 | Edited src/lib/components/SystemStatus.svelte | 18→18 lines | ~75 |
+| 22:18 | Edited src/lib/components/NetworkInfo.svelte | 18→18 lines | ~75 |
+| 22:18 | Edited src/lib/components/NetworkInfo.svelte | 6→6 lines | ~36 |
+| 22:18 | Edited src/lib/components/KeepAlive.svelte | 30→30 lines | ~135 |
+| 22:18 | Edited src/lib/components/KeepAlive.svelte | 9→10 lines | ~60 |
+| 22:19 | Edited src/lib/components/ProxyInfo.svelte | 27→27 lines | ~116 |
+| 22:19 | Edited src/lib/components/ProxyInfo.svelte | 7→7 lines | ~41 |
+| 22:20 | Edited src/lib/components/SystemStatus.svelte | modified formatRate() | ~72 |
+| 22:30 | Frontend density pass for 500px popover: root 13px, tight spacing, sessions table→aligned 2-line list, header/token/model fixes; QC via mocked-invoke headless chrome | +page.svelte, AgentTab, SystemStatus, NetworkInfo, KeepAlive, ProxyInfo | page 1731→1068px tall; svelte-check 0 errors; build ok | ~14000 |
+| 22:22 | Session end: 39 writes across 15 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 17 reads | ~33994 tok |

@@ -28,7 +28,14 @@
   /** @param {string} id */
   function truncateId(id) {
     if (!id) return "";
-    return id.length > 16 ? id.slice(0, 16) + "…" : id;
+    return id.length > 14 ? id.slice(0, 14) + "…" : id;
+  }
+
+  /** Show the tail of a path (most informative part) for narrow rows. */
+  function shortDir(/** @type {string} */ p) {
+    if (!p) return "";
+    const max = 38;
+    return p.length > max ? "…" + p.slice(p.length - max) : p;
   }
 
   /** @param {string} isoString */
@@ -212,54 +219,37 @@
 
   <!-- Sessions Section -->
   <div class="sessions-section">
-    <h3>Active Sessions</h3>
+    <div class="sessions-head">
+      <h3>Active Sessions</h3>
+      <span class="sessions-count">{sessions.length}</span>
+    </div>
     {#if sessions.length === 0}
       <p class="empty">No active sessions</p>
     {:else}
-      <table>
-        <thead>
-          <tr>
-            <th>Session</th>
-            <th>Mode</th>
-            <th>Status</th>
-            <th>Working Dir</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each sessions as sess}
-            <tr>
-              <td class="session-id">{truncateId(sess.id)}</td>
-              <td>
-                <span
-                  class="mode-badge"
-                  class:cli={sess.entrypoint === "cli" || sess.entrypoint === "sdk-cli"}
-                  class:gui={sess.entrypoint !== "cli" && sess.entrypoint !== "sdk-cli"}
-                >
-                  {sess.entrypoint || "—"}
-                </span>
-              </td>
-              <td>
-                <span
-                  class="status-badge"
-                  class:busy={sess.status === "busy"}
-                  class:idle={sess.status === "idle" || sess.status === "completed"}
-                >
-                  {sess.status}
-                </span>
-              </td>
-              <td class="workdir">
-                {#if sess.working_dir}
-                  <span title={sess.working_dir}>{sess.working_dir.split("/").pop()}/</span>
-                {:else}
-                  <span class="dim">—</span>
-                {/if}
-              </td>
-              <td class="time">{relativeTime(sess.started_at)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+      <div class="session-list">
+        {#each sessions as sess}
+          <div class="session-item">
+            <div class="session-top">
+              <span
+                class="s-dot"
+                class:busy={sess.status === "busy"}
+                title={sess.status}
+              ></span>
+              <span class="s-id">{truncateId(sess.id)}</span>
+              <span
+                class="s-mode"
+                class:gui={sess.entrypoint !== "cli" && sess.entrypoint !== "sdk-cli"}
+              >
+                {sess.entrypoint || "—"}
+              </span>
+              <span class="s-time">{relativeTime(sess.started_at)}</span>
+            </div>
+            <div class="session-dir" title={sess.working_dir || ""}>
+              {#if sess.working_dir}{shortDir(sess.working_dir)}{:else}<span class="dim">no working dir</span>{/if}
+            </div>
+          </div>
+        {/each}
+      </div>
     {/if}
   </div>
 </div>
@@ -268,28 +258,32 @@
   .agent-tab {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
   }
 
   .agent-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 9px 12px;
     background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    border-radius: 10px;
+    border: 1px solid #262626;
+    border-radius: 9px;
   }
 
   .agent-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
   }
 
   .dot {
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background: #666;
     flex-shrink: 0;
@@ -299,15 +293,17 @@
 
   .name {
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     color: #fff;
+    white-space: nowrap;
+    margin-right: 2px;
   }
 
   .ver-badge {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 4px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 500;
     font-family: "SF Mono", "Fira Code", monospace;
   }
@@ -315,13 +311,13 @@
   .ver-badge.cli { background: #0ea5e920; color: #0ea5e9; }
   .ver-badge.gui { background: #a855f720; color: #a855f7; }
 
-  .session-summary { display: flex; gap: 6px; }
+  .session-summary { display: flex; gap: 5px; flex-shrink: 0; }
 
   .badge {
     display: inline-block;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 0.72rem;
     font-weight: 500;
   }
 
@@ -332,30 +328,30 @@
   .badge.missing { background: #333; color: #666; }
 
   h3 {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #fff;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   /* Rate Limits */
   .rate-limits {
     background: #1a1a1a;
-    border: 1px solid #2a2a2a;
+    border: 1px solid #262626;
     border-radius: 10px;
-    padding: 16px;
+    padding: 12px;
   }
 
   .rate-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 8px;
   }
 
   .rate-card {
     background: #222;
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
   }
 
   .rate-header {
@@ -398,21 +394,21 @@
   /* Tokens */
   .tokens-section {
     background: #1a1a1a;
-    border: 1px solid #2a2a2a;
+    border: 1px solid #262626;
     border-radius: 10px;
-    padding: 16px;
+    padding: 12px;
   }
 
   .token-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
   }
 
   .token-card {
     background: #222;
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 7px;
+    padding: 7px 4px;
     text-align: center;
   }
 
@@ -422,15 +418,16 @@
   }
 
   .token-label {
-    font-size: 0.65rem;
+    font-size: 0.58rem;
     color: #888;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 4px;
+    letter-spacing: 0.01em;
+    margin-bottom: 3px;
+    white-space: nowrap;
   }
 
   .token-value {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #fff;
     font-variant-numeric: tabular-nums;
@@ -443,9 +440,9 @@
   /* Models */
   .models-section {
     background: #1a1a1a;
-    border: 1px solid #2a2a2a;
+    border: 1px solid #262626;
     border-radius: 10px;
-    padding: 16px;
+    padding: 12px;
   }
 
   .model-list {
@@ -457,36 +454,42 @@
   .model-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 6px 10px;
+    gap: 8px;
+    padding: 6px 9px;
     background: #222;
     border-radius: 6px;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
   }
 
   .model-name {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .model-tokens {
     color: #0ea5e9;
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
   }
 
   .model-requests {
     color: #888;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
+    flex-shrink: 0;
   }
 
   /* Summary */
   .summary-section {
     background: #1a1a1a;
-    border: 1px solid #2a2a2a;
+    border: 1px solid #262626;
     border-radius: 10px;
-    padding: 16px;
+    padding: 12px;
   }
 
   .summary-grid {
@@ -514,69 +517,94 @@
   }
 
   /* Sessions */
-  .sessions-section { overflow-x: auto; }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
+  .sessions-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 6px;
   }
 
-  th {
-    text-align: left;
-    padding: 8px 12px;
-    color: #888;
-    font-weight: 500;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid #2a2a2a;
+  .sessions-head h3 { margin-bottom: 0; }
+
+  .sessions-count {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #999;
+    background: #262626;
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-variant-numeric: tabular-nums;
   }
 
-  td {
-    padding: 8px 12px;
+  .session-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .session-item {
+    padding: 7px 0;
     border-bottom: 1px solid #1f1f1f;
-    color: #ccc;
+  }
+  .session-item:first-child { padding-top: 1px; }
+  .session-item:last-child { border-bottom: none; padding-bottom: 1px; }
+
+  .session-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  .session-id {
+  .s-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+  }
+  .s-dot.busy { background: #ef4444; }
+
+  .s-id {
     font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.8rem;
-    color: #888;
+    font-size: 0.78rem;
+    color: #ccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
-  .status-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
+  .s-mode {
+    flex-shrink: 0;
+    font-size: 0.64rem;
     font-weight: 500;
-  }
-
-  .status-badge.busy { background: #ef444420; color: #ef4444; }
-  .status-badge.idle { background: #22c55e20; color: #22c55e; }
-
-  .mode-badge {
-    display: inline-block;
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    background: #333;
-    color: #888;
+    background: #0ea5e920;
+    color: #0ea5e9;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .s-mode.gui { background: #a855f720; color: #a855f7; }
+
+  .s-time {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: #777;
+    font-variant-numeric: tabular-nums;
   }
 
-  .mode-badge.cli { background: #0ea5e920; color: #0ea5e9; }
-  .mode-badge.gui { background: #a855f720; color: #a855f7; }
-
-  .workdir {
-    max-width: 150px;
+  .session-dir {
+    margin-top: 2px;
+    margin-left: 15px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.72rem;
+    color: #777;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .time { color: #888; font-size: 0.8rem; }
   .dim { color: #555; }
-  .empty { color: #666; font-size: 0.9rem; text-align: center; padding: 20px; }
+  .empty { color: #666; font-size: 0.85rem; text-align: center; padding: 14px; }
 </style>

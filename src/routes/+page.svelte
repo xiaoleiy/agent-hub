@@ -152,56 +152,62 @@
     box-sizing: border-box;
   }
 
+  /* Compact base scale tuned for the ~500px menu-bar popover. */
+  :global(html) {
+    font-size: 13px;
+  }
+
   :global(body) {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       "Helvetica Neue", Arial, sans-serif;
     background: #0f0f0f;
     color: #e0e0e0;
-    line-height: 1.5;
+    line-height: 1.45;
   }
 
   .app {
     max-width: 960px;
     margin: 0 auto;
-    padding: 14px;
+    padding: 12px 12px 16px;
   }
 
   header {
-    margin-bottom: 24px;
+    margin-bottom: 12px;
   }
 
   header h1 {
-    font-size: 1.8rem;
+    font-size: 1.4rem;
     font-weight: 700;
+    letter-spacing: -0.01em;
     color: #ffffff;
   }
 
   .subtitle {
     color: #888;
-    font-size: 0.9rem;
-    margin-top: 2px;
+    font-size: 0.82rem;
+    margin-top: 1px;
   }
 
   .grid {
     display: grid;
     /* Collapses to one column at popover width, two when wider. */
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+    margin-bottom: 8px;
   }
 
   .card {
     background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
+    border: 1px solid #262626;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
   }
 
   .tab-bar {
     display: flex;
-    gap: 4px;
-    margin-bottom: 16px;
+    gap: 2px;
+    margin-bottom: 10px;
     border-bottom: 1px solid #2a2a2a;
     padding-bottom: 0;
     overflow-x: auto;
@@ -211,12 +217,12 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
+    padding: 6px 11px;
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
     color: #888;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -251,6 +257,6 @@
   }
 
   .tab-content {
-    min-height: 200px;
+    min-height: 80px;
   }
 </style>

@@ -75,32 +75,32 @@
 
 <style>
   .keepalive h2 {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #fff;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
 
   .description {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     color: #888;
-    margin-bottom: 16px;
+    margin-bottom: 10px;
   }
 
   .controls {
     display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 6px;
+    margin-bottom: 10px;
   }
 
   .controls button {
     flex: 1;
-    padding: 10px 16px;
+    padding: 7px 10px;
     background: #2a2a2a;
     border: 1px solid #3a3a3a;
-    border-radius: 8px;
+    border-radius: 7px;
     color: #ccc;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -126,10 +126,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
-    background: #1a1a1a;
+    padding: 8px 12px;
+    background: #222;
+    border: 1px solid #2a2a2a;
     border-radius: 8px;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
   }
 
   .status-active {

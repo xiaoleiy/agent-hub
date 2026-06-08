@@ -9,8 +9,8 @@
   }
 
   function formatRate(/** @type {number} */ bytesPerSec) {
-    if (bytesPerSec >= 1048576) return (bytesPerSec / 1048576).toFixed(2) + " MB/s";
-    if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(2) + " KB/s";
+    if (bytesPerSec >= 1048576) return (bytesPerSec / 1048576).toFixed(1) + " MB/s";
+    if (bytesPerSec >= 1024) return Math.round(bytesPerSec / 1024) + " KB/s";
     return Math.round(bytesPerSec) + " B/s";
   }
 </script>
@@ -72,20 +72,20 @@
 
 <style>
   .system-status h2 {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #fff;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .stat-grid {
     display: grid;
-    gap: 10px;
+    gap: 7px;
   }
 
   .stat {
     display: grid;
-    grid-template-columns: 90px 1fr auto;
+    grid-template-columns: 56px 1fr auto;
     align-items: center;
     gap: 8px;
   }

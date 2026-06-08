@@ -1,7 +1,11 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T13:19:27.468Z
-> Files: 117 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T14:20:38.605Z
+> Files: 118 tracked | Anatomy hits: 0 | Misses: 0
+
+## ../../../../tmp/
+
+- `ah_beacon_server.py` — H: do_GET, do_POST, log_message (~226 tok)
 
 ## ./
 
@@ -11,7 +15,7 @@
 - `jsconfig.json` (~193 tok)
 - `LICENSE` (~285 tok)
 - `package-lock.json` — npm lock file (~17995 tok)
-- `package.json` — Node.js package manifest (~219 tok)
+- `package.json` — Node.js package manifest (~263 tok)
 - `README.md` — Project documentation (~794 tok)
 - `svelte.config.js` — SvelteKit configuration (~137 tok)
 - `vite.config.js` — Vite build configuration (~237 tok)
@@ -230,15 +234,15 @@
 ## src/lib/components/
 
 - `AgentCard.svelte` — Svelte: AgentCard, 4 stores (~893 tok)
-- `AgentTab.svelte` — Svelte: AgentTab (~3836 tok)
-- `KeepAlive.svelte` — Svelte: KeepAlive, 2 stores (~955 tok)
-- `NetworkInfo.svelte` — Svelte: NetworkInfo, 1 stores (~443 tok)
-- `ProxyInfo.svelte` — Svelte: ProxyInfo, 3 stores (~3331 tok)
+- `AgentTab.svelte` — Svelte: AgentTab (~3988 tok)
+- `KeepAlive.svelte` — Svelte: KeepAlive (~977 tok)
+- `NetworkInfo.svelte` — Svelte: NetworkInfo (~443 tok)
+- `ProxyInfo.svelte` — Svelte: ProxyInfo (~3330 tok)
 - `SessionList.svelte` — Svelte: SessionList, 1 stores (~965 tok)
-- `SystemStatus.svelte` — Svelte: SystemStatus, 1 stores (~901 tok)
+- `SystemStatus.svelte` — Svelte: SystemStatus (~912 tok)
 - `UsageChart.svelte` — Svelte: UsageChart, 2 stores (~492 tok)
 
 ## src/routes/
 
 - `+layout.js` — Tauri doesn't have a Node.js server to do proper SSR (~83 tok)
-- `+page.svelte` — Svelte: +page, 13 stores (~1466 tok)
+- `+page.svelte` — Svelte: +page (~1554 tok)

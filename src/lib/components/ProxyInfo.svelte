@@ -208,29 +208,29 @@
   .proxy-info {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
   }
 
   .section {
     background: #1a1a1a;
-    border: 1px solid #2a2a2a;
+    border: 1px solid #262626;
     border-radius: 10px;
-    padding: 16px;
+    padding: 12px;
   }
 
   .section h3 {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #fff;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .service-name {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 12px;
-    font-size: 0.85rem;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
   }
 
   .label {
@@ -255,7 +255,7 @@
     background: #222;
     border: 1px solid #333;
     border-radius: 8px;
-    padding: 10px 12px;
+    padding: 8px 10px;
     transition: border-color 0.2s;
   }
 

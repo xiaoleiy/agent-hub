@@ -40,20 +40,20 @@
 
 <style>
   .network-info h2 {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #fff;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .info-grid {
     display: grid;
-    gap: 8px;
+    gap: 6px;
   }
 
   .info-row {
     display: grid;
-    grid-template-columns: 90px 1fr;
+    grid-template-columns: 56px 1fr;
     gap: 8px;
     align-items: center;
   }
@@ -71,7 +71,7 @@
   }
 
   .value.ip {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #22c55e;
     font-family: "SF Mono", "Fira Code", monospace;
