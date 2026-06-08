@@ -71,14 +71,45 @@ Rate limits are reported across rolling 5-hour and weekly subscription windows w
 
 > **macOS only** (10.15 Catalina or later).
 
-### Homebrew (recommended)
+### Homebrew — GUI app + CLI (recommended)
 
 ```bash
 brew tap xiaoleiy/tap
 brew install --cask xiaoleiy/tap/agent-hub
 ```
 
-This installs both the **GUI app** and the **`agent-hub` CLI**.
+Installs the **Agent Hub** menu-bar app and the **`agent-hub`** CLI/TUI. The app
+goes to `/Applications` (Homebrew may prompt for your password once).
+
+**No admin rights?** Install the app into your home folder instead:
+
+```bash
+brew install --cask --appdir=~/Applications xiaoleiy/tap/agent-hub
+```
+
+### Homebrew — CLI / TUI only (no admin, no GUI)
+
+Just the `agent-hub` command — installs into the Homebrew prefix, so **no `sudo`
+and no Gatekeeper prompts**. Ideal for terminal users and IT-managed Macs:
+
+```bash
+brew tap xiaoleiy/tap
+brew install xiaoleiy/tap/agent-hub-cli
+agent-hub tui
+```
+
+### Manual download (no Homebrew, no admin)
+
+1. Download the `.dmg` for your chip from the [latest release](https://github.com/xiaoleiy/agent-hub/releases/latest) and drag **Agent Hub.app** into `~/Apps` (or `~/Applications`).
+2. The app is ad-hoc signed but not notarized, so macOS may flag it on first open. Clear that without admin:
+   ```bash
+   xattr -cr "$HOME/Apps/Agent Hub.app"
+   codesign --force --deep --sign - "$HOME/Apps/Agent Hub.app"
+   ```
+3. (Optional) put the CLI/TUI on your PATH — it's the same binary:
+   ```bash
+   ln -sf "$HOME/Apps/Agent Hub.app/Contents/MacOS/agent-hub" "$HOME/.local/bin/agent-hub"
+   ```
 
 ### Build from source
 

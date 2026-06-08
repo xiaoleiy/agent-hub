@@ -169,3 +169,8 @@
 | 15:40 | Session end: 38 writes across 10 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 9 reads | ~21454 tok |
 | 15:55 | Session end: 38 writes across 10 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 9 reads | ~21454 tok |
 | 16:05 | Verified TAP_GITHUB_TOKEN automation (update-tap ran on re-publish, cross-repo push OK, 'No changes' since cask current); confirmed CI status badge live=passing+clickable in README | homebrew-tap, README badge | update-tap success; shields CI badge -> passing; native badge 200 | ~6k |
+| 16:06 | Session end: 38 writes across 10 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 9 reads | ~21454 tok |
+| 16:20 | Edited src-tauri/tauri.conf.json | 3→4 lines | ~26 |
+| 16:23 | Created packaging/homebrew/Formula/agent-hub-cli.rb | — | ~363 |
+| 16:27 | Created packaging/homebrew/Formula/agent-hub-cli.rb | — | ~358 |
+| 16:35 | No-admin distribution: tauri ad-hoc signingIdentity fix (no more 'damaged'); CLI-only formula agent-hub-cli (verified installs to /opt/homebrew/bin, no sudo); release auto-updates cask+formula (verified on runner); README install rewritten | tauri.conf.json, packaging/homebrew/Formula, release.yml, README.md, tap | formula install OK; update-tap success bumps both; YAML valid | ~50k |

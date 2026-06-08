@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T06:56:07.009Z
-> Files: 115 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T08:27:13.974Z
+> Files: 116 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -152,12 +152,16 @@
 
 - `$types.d.ts` — Exports RequiredKeys, Snapshot, PageServerData, PageData + 6 more (~509 tok)
 
+## packaging/homebrew/Formula/
+
+- `agent-hub-cli.rb` — CLI/TUI-only install of Agent Hub — no GUI app, no sudo, no Gatekeeper. (~358 tok)
+
 ## src-tauri/
 
 - `.gitignore` — Git ignore rules (~45 tok)
 - `build.rs` (~12 tok)
 - `Cargo.toml` — Rust package manifest (~284 tok)
-- `tauri.conf.json` (~356 tok)
+- `tauri.conf.json` (~364 tok)
 
 ## src-tauri/capabilities/
 
