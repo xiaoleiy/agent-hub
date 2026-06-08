@@ -1,5 +1,6 @@
 use crate::models::types::{
-    AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage, UsageStats,
+    AccountInfo, AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage,
+    UsageStats,
 };
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -102,6 +103,45 @@ pub fn detect() -> AgentInfo {
         } else {
             None
         },
+        account: get_account(),
+    }
+}
+
+// ~/.claude.json can be large; cache the parsed account by file mtime.
+static CLAUDE_ACCOUNT_CACHE: Mutex<Option<(SystemTime, Option<AccountInfo>)>> = Mutex::new(None);
+
+/// Logged-in account from ~/.claude.json `oauthAccount`.
+fn get_account() -> Option<AccountInfo> {
+    let path = home().join(".claude.json");
+    let mtime = fs::metadata(&path).ok()?.modified().ok()?;
+    if let Ok(guard) = CLAUDE_ACCOUNT_CACHE.lock() {
+        if let Some((m, acc)) = guard.as_ref() {
+            if *m == mtime {
+                return acc.clone();
+            }
+        }
+    }
+    let acc = parse_claude_account(&path);
+    if let Ok(mut guard) = CLAUDE_ACCOUNT_CACHE.lock() {
+        *guard = Some((mtime, acc.clone()));
+    }
+    acc
+}
+
+fn parse_claude_account(path: &Path) -> Option<AccountInfo> {
+    let data = fs::read_to_string(path).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&data).ok()?;
+    let acc = v.get("oauthAccount")?;
+    let s = |k: &str| acc.get(k).and_then(|x| x.as_str()).map(str::to_string);
+    let info = AccountInfo {
+        email: s("emailAddress"),
+        display_name: s("displayName"),
+        organization: s("organizationName"),
+    };
+    if info.email.is_none() && info.display_name.is_none() {
+        None
+    } else {
+        Some(info)
     }
 }
 

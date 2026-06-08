@@ -1,7 +1,10 @@
-use crate::models::types::{AgentInfo, AgentType, AgentUsage, RateWindow, Session, UsageStats};
+use crate::models::types::{
+    AccountInfo, AgentInfo, AgentType, AgentUsage, RateWindow, Session, UsageStats,
+};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde::Deserialize;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -61,6 +64,25 @@ pub fn detect() -> AgentInfo {
         cli_version,
         gui_version,
         install_path: app_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+        account: get_account(),
+    }
+}
+
+/// Logged-in account from ~/.cursor/cli-config.json `authInfo`.
+fn get_account() -> Option<AccountInfo> {
+    let data = fs::read_to_string(cursor_dir().join("cli-config.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&data).ok()?;
+    let info = v.get("authInfo")?;
+    let s = |k: &str| info.get(k).and_then(|x| x.as_str()).map(str::to_string);
+    let account = AccountInfo {
+        email: s("email"),
+        display_name: s("displayName"),
+        organization: None,
+    };
+    if account.email.is_none() && account.display_name.is_none() {
+        None
+    } else {
+        Some(account)
     }
 }
 

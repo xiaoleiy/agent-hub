@@ -1,4 +1,5 @@
-use crate::models::types::{AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage, UsageStats};
+use crate::models::types::{AccountInfo, AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage, UsageStats};
+use base64::Engine;
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use std::collections::HashMap;
@@ -77,6 +78,33 @@ pub fn detect() -> AgentInfo {
         } else {
             None
         },
+        account: get_account(),
+    }
+}
+
+/// Logged-in account from ~/.codex/auth.json (decode the id_token JWT payload).
+fn get_account() -> Option<AccountInfo> {
+    let data = std::fs::read_to_string(codex_dir().join("auth.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&data).ok()?;
+    let id_token = v
+        .pointer("/tokens/id_token")
+        .or_else(|| v.get("id_token"))
+        .and_then(|x| x.as_str())?;
+    let payload = id_token.split('.').nth(1)?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
+    let claims: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    let s = |k: &str| claims.get(k).and_then(|x| x.as_str()).map(str::to_string);
+    let info = AccountInfo {
+        email: s("email"),
+        display_name: s("name"),
+        organization: None,
+    };
+    if info.email.is_none() && info.display_name.is_none() {
+        None
+    } else {
+        Some(info)
     }
 }
 

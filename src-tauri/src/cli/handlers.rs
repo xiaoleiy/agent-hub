@@ -153,6 +153,17 @@ pub fn agents(json: bool) {
             version_str.dimmed(),
             session_detail
         );
+
+        if let Some(acc) = &agent.account {
+            if let Some(who) = acc.email.as_deref().or(acc.display_name.as_deref()) {
+                let org = acc
+                    .organization
+                    .as_deref()
+                    .map(|o| format!(" ({})", o))
+                    .unwrap_or_default();
+                println!("      {} {}{}", "Account:".dimmed(), who.green(), org.dimmed());
+            }
+        }
     }
 }
 

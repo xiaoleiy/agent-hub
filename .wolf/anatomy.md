@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T05:32:59.531Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T06:03:55.241Z
 > Files: 114 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -155,7 +155,7 @@
 
 - `.gitignore` — Git ignore rules (~45 tok)
 - `build.rs` (~12 tok)
-- `Cargo.toml` — Rust package manifest (~279 tok)
+- `Cargo.toml` — Rust package manifest (~284 tok)
 - `tauri.conf.json` (~356 tok)
 
 ## src-tauri/capabilities/
@@ -180,7 +180,7 @@
 
 ## src-tauri/src/cli/
 
-- `handlers.rs` — status, network, agents, sessions, usage (~2915 tok)
+- `handlers.rs` — status, network, agents, sessions, usage (~3031 tok)
 - `mod.rs` — Show system status (CPU, RAM, uptime, network) (~729 tok)
 
 ## src-tauri/src/commands/
@@ -202,20 +202,20 @@
 
 ## src-tauri/src/core_modules/agents/
 
-- `claude.rs` — detect, get_sessions, get_usage, get_rich_usage (~6451 tok)
-- `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~5691 tok)
+- `claude.rs` — detect, get_sessions, get_usage, get_rich_usage (~6809 tok)
+- `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~5961 tok)
 - `cursor_cookies.rs` — Best-effort extraction of the Cursor session cookie (~2878 tok)
-- `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4344 tok)
+- `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4528 tok)
 - `mod.rs` — Detect all agents and return their info (~345 tok)
 
 ## src-tauri/src/models/
 
 - `mod.rs` (~5 tok)
-- `types.rs` — System status information (~1491 tok)
+- `types.rs` — System status information (~1615 tok)
 
 ## src-tauri/src/tui/
 
-- `mod.rs` — run_tui (~13896 tok)
+- `mod.rs` — run_tui (~14205 tok)
 
 ## src/
 

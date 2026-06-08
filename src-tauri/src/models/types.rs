@@ -49,6 +49,20 @@ pub struct AgentInfo {
     pub cli_version: Option<String>,
     pub gui_version: Option<String>,
     pub install_path: Option<String>,
+    /// Logged-in account (read from the agent's local config), if available.
+    #[serde(default)]
+    pub account: Option<AccountInfo>,
+}
+
+/// The logged-in account for an agent, sourced from its local config.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AccountInfo {
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub organization: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

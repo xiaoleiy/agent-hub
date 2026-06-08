@@ -682,10 +682,21 @@ fn draw_agents_summary(f: &mut Frame, app: &App, area: Rect) {
 
             let cli_v = a.cli_version.as_deref().unwrap_or("—");
             let gui_v = a.gui_version.as_deref().unwrap_or("—");
+            let account = a
+                .account
+                .as_ref()
+                .and_then(|acc| acc.email.as_deref().or(acc.display_name.as_deref()))
+                .unwrap_or("—");
+            let account_style = if account == "—" {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::Green)
+            };
 
             Row::new(vec![
                 Cell::from(status_icon).style(Style::default().fg(status_color)),
                 Cell::from(a.name.as_str()).style(Style::default().add_modifier(Modifier::BOLD)),
+                Cell::from(account).style(account_style),
                 Cell::from(cli_v).style(Style::default().fg(Color::Cyan)),
                 Cell::from(gui_v).style(Style::default().fg(Color::Magenta)),
                 Cell::from(status_text).style(Style::default().fg(status_color)),
@@ -695,14 +706,15 @@ fn draw_agents_summary(f: &mut Frame, app: &App, area: Rect) {
 
     let widths = [
         Constraint::Length(2),
+        Constraint::Length(12),
+        Constraint::Min(20),
+        Constraint::Length(18),
         Constraint::Length(14),
-        Constraint::Length(22),
-        Constraint::Length(16),
-        Constraint::Min(14),
+        Constraint::Length(13),
     ];
 
     let table = Table::new(rows, widths).header(
-        Row::new(vec!["", "Agent", "CLI Ver", "GUI Ver", "Status"])
+        Row::new(vec!["", "Agent", "Account", "CLI Ver", "GUI Ver", "Status"])
             .style(Style::default().fg(Color::DarkGray)),
     );
     f.render_widget(table, inner);
@@ -795,7 +807,7 @@ fn draw_agent_header(f: &mut Frame, agent: &AgentInfo, area: Rect) {
     let cli_v = agent.cli_version.as_deref().unwrap_or("—");
     let gui_v = agent.gui_version.as_deref().unwrap_or("—");
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(vec![
             Span::styled(format!(" {} ", status_icon), Style::default().fg(status_color)),
             Span::styled(status_text, Style::default().fg(status_color)),
@@ -807,6 +819,27 @@ fn draw_agent_header(f: &mut Frame, agent: &AgentInfo, area: Rect) {
             Span::styled(gui_v, Style::default().fg(Color::Magenta)),
         ]),
     ];
+
+    if let Some(acc) = &agent.account {
+        let who = acc
+            .email
+            .as_deref()
+            .or(acc.display_name.as_deref())
+            .unwrap_or("");
+        if !who.is_empty() {
+            let mut spans = vec![
+                Span::raw(" Account: "),
+                Span::styled(who.to_string(), Style::default().fg(Color::Green)),
+            ];
+            if let Some(org) = &acc.organization {
+                spans.push(Span::styled(
+                    format!("  ({})", org),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            lines.push(Line::from(spans));
+        }
+    }
 
     let p = Paragraph::new(lines);
     f.render_widget(p, inner);

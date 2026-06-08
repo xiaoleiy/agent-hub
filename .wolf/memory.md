@@ -134,3 +134,17 @@
 | 13:32 | Edited src-tauri/src/core_modules/agents/cursor_cookies.rs | modified find_cursor_session_cookie() | ~171 |
 | 13:34 | Added Cursor rate limits via browser-cookie import (Chrome AES-CBC+Keychain, Firefox/Safari); cursor.com/api/usage-summary -> Plan/On-Demand windows; added RateWindow.label | agents/cursor_cookies.rs(new), cursor.rs, types.rs, tui/mod.rs, cli/handlers.rs, Cargo.toml | builds; 41 tests pass; Cursor UNVERIFIED (Keychain prompt blocks headless verify) | ~70k |
 | 13:34 | Session end: 17 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 1 reads | ~9990 tok |
+| 13:42 | Session end: 17 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 1 reads | ~9990 tok |
+| 14:00 | Edited src-tauri/src/models/types.rs | expanded (+14 lines) | ~256 |
+| 14:00 | Edited src-tauri/Cargo.toml | 1→2 lines | ~8 |
+| 14:01 | Edited src-tauri/src/core_modules/agents/claude.rs | 3→4 lines | ~38 |
+| 14:01 | Edited src-tauri/src/core_modules/agents/claude.rs | added optional chaining | ~400 |
+| 14:02 | Edited src-tauri/src/core_modules/agents/codex.rs | added 1 import(s) | ~48 |
+| 14:02 | Edited src-tauri/src/core_modules/agents/codex.rs | modified get_account() | ~330 |
+| 14:02 | Edited src-tauri/src/core_modules/agents/cursor.rs | 5→8 lines | ~62 |
+| 14:02 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified get_account() | ~199 |
+| 14:02 | Edited src-tauri/src/tui/mod.rs | expanded (+12 lines) | ~394 |
+| 14:02 | Edited src-tauri/src/tui/mod.rs | modified is_empty() | ~324 |
+| 14:03 | Edited src-tauri/src/cli/handlers.rs | expanded (+11 lines) | ~165 |
+| 14:04 | Added agent login account (email/name/org) detection from local config + display in dashboard Agents column, agent header, and agents CLI | types.rs, agents/{claude,codex,cursor}.rs, tui/mod.rs, cli/handlers.rs, Cargo.toml(base64) | verified all 3: claude essexlg, codex+cursor gmail; 41 tests pass | ~30k |
+| 14:04 | Session end: 28 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 1 reads | ~12375 tok |
