@@ -29,37 +29,50 @@ struct App {
     system: SystemStatus,
     network: Option<NetworkInfo>,
     agents: Vec<AgentInfo>,
-    /// Sessions grouped by agent index
+    /// Sessions grouped by agent index (lazy: filled when the agent tab is viewed)
     agent_sessions: Vec<Vec<Session>>,
-    /// Usage stats per agent
+    /// 5h usage per agent — drives the Dashboard mini chart
     agent_usage_5h: Vec<UsageStats>,
-    agent_usage_1w: Vec<UsageStats>,
-    agent_rich_usage: Vec<AgentUsage>,
-    proxy: ProxyInfo,
+    /// Rich usage per agent (lazy: None until the agent tab is viewed)
+    agent_rich_usage: Vec<Option<AgentUsage>>,
+    /// Proxy/VPN info (lazy: None until the Proxy tab is viewed — probing is slow)
+    proxy: Option<ProxyInfo>,
     keepalive: KeepAliveStatus,
     active_tab: usize,
     last_refresh: Instant,
     network_loaded: bool,
+    /// Per-agent flag: has the agent detail (sessions + rich usage) been loaded?
+    agent_detail_loaded: Vec<bool>,
+}
+
+/// Which kind of data the currently-active tab needs loaded.
+enum TabKind {
+    Dashboard,
+    Agent(usize), // global index into `agents`
+    Proxy,
+    KeepAlive,
 }
 
 impl App {
     fn new() -> Self {
-        let agents = agents::detect_all_agents();
-        let agent_count = agents.len();
-        Self {
+        let mut app = Self {
             system: system::get_system_status(),
             network: None,
-            agents,
-            agent_sessions: vec![Vec::new(); agent_count],
+            agents: Vec::new(),
+            agent_sessions: Vec::new(),
             agent_usage_5h: Vec::new(),
-            agent_usage_1w: Vec::new(),
             agent_rich_usage: Vec::new(),
-            proxy: proxy::get_proxy_info(),
+            proxy: None,
             keepalive: keepalive::get_keepalive_status(),
             active_tab: 0,
             last_refresh: Instant::now(),
             network_loaded: false,
-        }
+            agent_detail_loaded: Vec::new(),
+        };
+        // Startup only loads what the Dashboard (initial tab) needs. Proxy probing
+        // and per-agent detail are loaded lazily when those tabs are first viewed.
+        app.refresh_dashboard();
+        app
     }
 
     /// Build tab names: ["Dashboard", <agent1>, <agent2>, ..., "Proxy / VPN", "Keep-Alive"]
@@ -80,59 +93,125 @@ impl App {
         self.agents.iter().filter(|a| a.installed).collect()
     }
 
-    /// Number of dynamic tabs
-    fn tab_count(&self) -> usize {
-        // Dashboard + installed agents + Keep-Alive
-        1 + self.installed_agents().len() + 1
+    /// Global indices into `agents` for the installed agents, in tab order.
+    fn installed_indices(&self) -> Vec<usize> {
+        self.agents
+            .iter()
+            .enumerate()
+            .filter(|(_, a)| a.installed)
+            .map(|(i, _)| i)
+            .collect()
     }
 
-    fn refresh(&mut self) {
-        self.system = system::get_system_status();
-        self.agents = agents::detect_all_agents();
-        self.proxy = proxy::get_proxy_info();
-        self.keepalive = keepalive::get_keepalive_status();
+    /// Total number of tabs. Single source of truth: matches `tab_names()`
+    /// (Dashboard + installed agents + Proxy/VPN + Keep-Alive).
+    fn tab_count(&self) -> usize {
+        self.tab_names().len()
+    }
 
-        // Load network once
+    /// What data does the active tab need?
+    fn active_tab_kind(&self) -> TabKind {
+        let last = self.tab_count().saturating_sub(1);
+        if self.active_tab == 0 {
+            TabKind::Dashboard
+        } else if self.active_tab >= last {
+            TabKind::KeepAlive
+        } else if self.active_tab == last - 1 {
+            TabKind::Proxy
+        } else {
+            // Agent tab: active_tab 1..=installed maps into installed_indices.
+            match self.installed_indices().get(self.active_tab - 1) {
+                Some(&global_idx) => TabKind::Agent(global_idx),
+                None => TabKind::Dashboard,
+            }
+        }
+    }
+
+    /// Keep the lazy per-agent buffers aligned with the current agents list.
+    fn resize_agent_buffers(&mut self) {
+        let n = self.agents.len();
+        self.agent_sessions.resize(n, Vec::new());
+        self.agent_rich_usage.resize(n, None);
+        self.agent_detail_loaded.resize(n, false);
+    }
+
+    /// Load the data the Dashboard shows. Cheap enough to run on every tick.
+    fn refresh_dashboard(&mut self) {
+        self.agents = agents::detect_all_agents();
+        self.resize_agent_buffers();
+
+        // External IP is fetched once — it doesn't change between ticks.
         if !self.network_loaded {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            if let Ok(info) = rt.block_on(network::get_network_info()) {
-                self.network = Some(info);
-                self.network_loaded = true;
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                if let Ok(info) = rt.block_on(network::get_network_info()) {
+                    self.network = Some(info);
+                    self.network_loaded = true;
+                }
             }
         }
 
-        // Per-agent sessions
-        self.agent_sessions = self
-            .agents
-            .iter()
-            .map(|a| agents::get_sessions(&a.agent_type))
-            .collect();
-
-        // Per-agent usage (5h and 1w)
+        // 5h usage drives the dashboard mini bar chart.
         self.agent_usage_5h = self
             .agents
             .iter()
             .map(|a| agents::get_usage(&a.agent_type, "5h"))
             .collect();
-        self.agent_usage_1w = self
-            .agents
-            .iter()
-            .map(|a| agents::get_usage(&a.agent_type, "1w"))
-            .collect();
+    }
 
-        // Rich usage with token breakdowns and rate limits
-        self.agent_rich_usage = self
-            .agents
-            .iter()
-            .map(|a| agents::get_rich_usage(&a.agent_type))
-            .collect();
+    /// Re-read keep-alive status (cheap).
+    fn refresh_keepalive(&mut self) {
+        self.keepalive = keepalive::get_keepalive_status();
+    }
 
-        // Clamp active_tab to valid range after agents list may have changed
+    /// Probe proxy/VPN state. Slow (subprocess spawns + localhost HTTP probes),
+    /// so only called when the Proxy tab is visible.
+    fn refresh_proxy(&mut self) {
+        self.proxy = Some(proxy::get_proxy_info());
+    }
+
+    /// Load sessions + rich usage for one agent (index into `agents`).
+    fn refresh_agent_detail(&mut self, idx: usize) {
+        if idx >= self.agents.len() {
+            return;
+        }
+        let agent_type = self.agents[idx].agent_type.clone();
+        self.agent_sessions[idx] = agents::get_sessions(&agent_type);
+        self.agent_rich_usage[idx] = Some(agents::get_rich_usage(&agent_type));
+        self.agent_detail_loaded[idx] = true;
+    }
+
+    /// Lazily load the active tab's data on first view (cheap if already loaded).
+    fn ensure_active_tab_loaded(&mut self) {
+        match self.active_tab_kind() {
+            TabKind::Proxy => {
+                if self.proxy.is_none() {
+                    self.refresh_proxy();
+                }
+            }
+            TabKind::Agent(idx) => {
+                if !self.agent_detail_loaded.get(idx).copied().unwrap_or(false) {
+                    self.refresh_agent_detail(idx);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Periodic refresh: live system stats plus only the active tab's data.
+    fn tick_refresh(&mut self) {
+        self.system = system::get_system_status();
+        self.keepalive = keepalive::get_keepalive_status();
+        match self.active_tab_kind() {
+            TabKind::Dashboard => self.refresh_dashboard(),
+            TabKind::Proxy => self.refresh_proxy(),
+            TabKind::Agent(idx) => self.refresh_agent_detail(idx),
+            TabKind::KeepAlive => {}
+        }
+        // Agents list may have changed length; keep active_tab in range.
         let count = self.tab_count();
         if count > 0 && self.active_tab >= count {
             self.active_tab = count - 1;
         }
-
         self.last_refresh = Instant::now();
     }
 
@@ -186,12 +265,13 @@ pub fn run_tui() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     let mut app = App::new();
-    app.refresh();
 
     let tick_rate = Duration::from_secs(3);
     let mut last_tick = Instant::now();
 
     loop {
+        // Lazily load the active tab's data before drawing (one-time per tab).
+        app.ensure_active_tab_loaded();
         terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let timeout = tick_rate
@@ -238,23 +318,23 @@ pub fn run_tui() {
                         }
                         KeyCode::Char(' ') => {
                             app.toggle_keepalive();
-                            app.refresh();
+                            app.refresh_keepalive();
                         }
                         KeyCode::Char('a') => {
                             app.set_keepalive_mode("30m");
-                            app.refresh();
+                            app.refresh_keepalive();
                         }
                         KeyCode::Char('s') => {
                             app.set_keepalive_mode("1h");
-                            app.refresh();
+                            app.refresh_keepalive();
                         }
                         KeyCode::Char('d') => {
                             app.set_keepalive_mode("3h");
-                            app.refresh();
+                            app.refresh_keepalive();
                         }
                         KeyCode::Char('f') => {
                             app.set_keepalive_mode("forever");
-                            app.refresh();
+                            app.refresh_keepalive();
                         }
                         _ => {}
                     }
@@ -263,7 +343,7 @@ pub fn run_tui() {
         }
 
         if last_tick.elapsed() >= tick_rate {
-            app.refresh();
+            app.tick_refresh();
             last_tick = Instant::now();
         }
     }
@@ -330,7 +410,10 @@ fn draw(f: &mut Frame, app: &mut App) {
     } else if app.active_tab == last_tab {
         draw_keepalive(f, app, chunks[1]);
     } else if app.active_tab == last_tab - 1 {
-        draw_proxy_tab(f, &app.proxy, chunks[1]);
+        match &app.proxy {
+            Some(p) => draw_proxy_tab(f, p, chunks[1]),
+            None => draw_loading(f, chunks[1], " Proxy / VPN "),
+        }
     } else {
         // Agent tab
         let agent_idx = app.active_tab - 1;
@@ -338,7 +421,7 @@ fn draw(f: &mut Frame, app: &mut App) {
             let agent = installed[agent_idx];
             if let Some(all_idx) = app.agents.iter().position(|a| a.agent_type == agent.agent_type) {
                 let sessions = app.agent_sessions.get(all_idx).cloned().unwrap_or_default();
-                let rich = app.agent_rich_usage.get(all_idx).cloned();
+                let rich = app.agent_rich_usage.get(all_idx).cloned().flatten();
                 draw_agent_tab(f, agent, &sessions, rich.as_ref(), chunks[1]);
             }
         }
@@ -358,6 +441,17 @@ fn draw(f: &mut Frame, app: &mut App) {
     let status_bar = Paragraph::new(status)
         .style(Style::default().fg(Color::DarkGray));
     f.render_widget(status_bar, chunks[2]);
+}
+
+/// Placeholder shown while a lazily-loaded tab's data is being fetched.
+fn draw_loading(f: &mut Frame, area: Rect, title: &str) {
+    let block = Block::default().borders(Borders::ALL).title(title.to_string());
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    f.render_widget(
+        Paragraph::new(" Loading…").style(Style::default().fg(Color::DarkGray)),
+        inner,
+    );
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────

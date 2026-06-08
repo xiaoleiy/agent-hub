@@ -56,3 +56,19 @@
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+
+## Session: 2026-06-08 10:08
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 10:09 | Explored codebase; explained 3 modes (GUI/CLI/TUI); CUI=ratatui TUI via 'cargo run ... -- tui' | lib.rs, cli/mod.rs, README.md | Rust toolchain not installed on machine | ~3k |
+| 10:28 | Edited src-tauri/src/core_modules/system.rs | 4→8 lines | ~109 |
+| 10:28 | Edited src-tauri/src/tui/mod.rs | expanded (+11 lines) | ~254 |
+| 10:28 | Edited src-tauri/src/tui/mod.rs | modified new() | ~1544 |
+| 10:29 | Edited src-tauri/src/tui/mod.rs | 8→9 lines | ~81 |
+| 10:29 | Edited src-tauri/src/tui/mod.rs | refresh() → refresh_keepalive() | ~247 |
+| 10:29 | Edited src-tauri/src/tui/mod.rs | refresh() → tick_refresh() | ~34 |
+| 10:29 | Edited src-tauri/src/tui/mod.rs | modified len() | ~202 |
+| 10:29 | Edited src-tauri/src/tui/mod.rs | modified draw_loading() | ~146 |
+| 10:31 | Fixed TUI: Tab can now reach Keep-Alive (tab_count=tab_names.len); lazy-load Proxy+agent tabs, tick refreshes only active tab; slimmed get_system_status | tui/mod.rs, system.rs | builds clean; 39/40 tests pass (1 env-only Cursor.app fail) | ~12k |
+| 10:31 | Session end: 8 writes across 2 files (system.rs, mod.rs) | 9 reads | ~26939 tok |

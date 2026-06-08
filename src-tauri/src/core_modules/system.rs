@@ -14,10 +14,14 @@ static PREV_NETWORK: Mutex<Option<NetworkSnapshot>> = Mutex::new(None);
 /// Gather current system status: CPU, RAM, uptime, network I/O, username.
 /// Network rates (upload/download) are computed as bytes/sec since the last call.
 pub fn get_system_status() -> SystemStatus {
-    let mut sys = System::new_all();
-    sys.refresh_all();
+    // Only CPU + memory are needed here; avoid System::new_all(), which enumerates
+    // every process (twice, with refresh_all) and dominates this call's cost.
+    // A valid CPU% needs two samples spaced by a short interval.
+    let mut sys = System::new();
+    sys.refresh_cpu_usage();
     std::thread::sleep(std::time::Duration::from_millis(200));
-    sys.refresh_all();
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
 
     // CPU
     let cpu_usage = sys.global_cpu_usage();

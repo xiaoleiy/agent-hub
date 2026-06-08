@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-07T15:45:52.887Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T02:29:26.050Z
 > Files: 113 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -198,7 +198,7 @@
 - `mod.rs` (~24 tok)
 - `network.rs` — Fetch public network information from ipinfo.io (~84 tok)
 - `proxy.rs` — Gather all proxy/VPN information for the system (~5588 tok)
-- `system.rs` — Gather current system status: CPU, RAM, uptime, network I/O, username. (~1526 tok)
+- `system.rs` — Gather current system status: CPU, RAM, uptime, network I/O, username. (~1494 tok)
 
 ## src-tauri/src/core_modules/agents/
 
@@ -214,7 +214,7 @@
 
 ## src-tauri/src/tui/
 
-- `mod.rs` — run_tui (~12756 tok)
+- `mod.rs` — run_tui (~13814 tok)
 
 ## src/
 

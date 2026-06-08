@@ -85,6 +85,62 @@
       "related_bugs": [],
       "occurrences": 3,
       "last_seen": "2026-06-07T15:45:52.901Z"
+    },
+    {
+      "id": "bug-006",
+      "timestamp": "2026-06-08T02:28:12.294Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/core_modules/system.rs",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 4→8 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T02:28:12.294Z"
+    },
+    {
+      "id": "bug-007",
+      "timestamp": "2026-06-08T02:28:23.958Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/tui/mod.rs",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 16→27 lines (5 removed) | Also: let agents = agents::detect_all_agents();; let agent_count = agents.len();",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-08T02:28:54.017Z"
+    },
+    {
+      "id": "bug-008",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "error_message": "TUI: cannot reach the last tab (Keep-Alive) using the Tab/arrow keys",
+      "file": "src-tauri/src/tui/mod.rs",
+      "root_cause": "App::tab_count() returned `1 + installed_agents().len() + 1`, omitting the Proxy/VPN tab, while tab_names() built `[Dashboard, ...agents, Proxy/VPN, Keep-Alive]`. next_tab()/prev_tab() cycle modulo tab_count(), so the real last index (Keep-Alive) was unreachable. The draw path used tab_names().len(), so the two counts had drifted out of sync.",
+      "fix": "Made tab_count() return self.tab_names().len() — single source of truth, so the navigable tab count always matches the rendered tabs.",
+      "tags": ["tui", "tab", "navigation", "off-by-one", "keep-alive"],
+      "related_bugs": ["bug-003"],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
+    },
+    {
+      "id": "bug-009",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "error_message": "TUI starts slowly and is laggy when switching tabs with Tab",
+      "file": "src-tauri/src/tui/mod.rs",
+      "root_cause": "App::new() ran a full data collection and then app.refresh() ran it AGAIN before the first frame. The full refresh() ran every 3s tick inline (blocking the event loop, so key presses queued during a tick were delayed seconds). It always probed proxy (proxy::get_proxy_info: ~6 networksetup/scutil subprocess spawns + 7 localhost HTTP probes each creating its own tokio runtime + up to 16 pgrep spawns) and loaded every agent's sessions/5h-usage/1w-usage/rich-usage regardless of the active tab. agent_usage_1w was fetched on every tick but never rendered. system::get_system_status() used System::new_all() (enumerates all processes twice) for data that only needs CPU+RAM.",
+      "fix": "Lazy-load per tab: Dashboard data at startup; Proxy and per-agent detail loaded only when their tab is first viewed (cached via proxy: Option + agent_detail_loaded flags). Periodic tick_refresh() now refreshes only system stats + the active tab's data. Removed the redundant startup refresh and the never-rendered agent_usage_1w fetch. Slimmed get_system_status() to System::new() + refresh_cpu_usage()/refresh_memory() instead of new_all()+refresh_all() twice.",
+      "tags": ["tui", "performance", "startup", "lazy-loading", "proxy", "event-loop", "sysinfo"],
+      "related_bugs": ["bug-008"],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
     }
   ]
 }
