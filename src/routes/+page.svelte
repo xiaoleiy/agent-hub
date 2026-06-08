@@ -163,7 +163,7 @@
   .app {
     max-width: 960px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 14px;
   }
 
   header {
@@ -184,8 +184,9 @@
 
   .grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    /* Collapses to one column at popover width, two when wider. */
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
     margin-bottom: 16px;
   }
 

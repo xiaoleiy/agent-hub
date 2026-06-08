@@ -405,7 +405,7 @@
 
   .token-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
     gap: 8px;
   }
 

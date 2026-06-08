@@ -179,3 +179,9 @@
 | 16:57 | Edited src-tauri/tauri.conf.json | 15→15 lines | ~94 |
 | 16:58 | Edited src-tauri/Cargo.toml | inline fix | ~18 |
 | 17:05 | GUI -> menu-bar app (Accessory/no-dock, hidden-on-launch, tray-anchored window, Quit menu, image-png for tray); TUI Active Sessions id column responsive; formula caveats (command is agent-hub) | lib.rs, tauri.conf.json, Cargo.toml, tui/mod.rs, formula | fmt/clippy clean, 41 tests, tauri build bundles valid-signed .app | ~45k |
+| 17:05 | Session end: 44 writes across 12 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 10 reads | ~24599 tok |
+
+## Session: 2026-06-08 17:17
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
