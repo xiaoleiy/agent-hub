@@ -164,3 +164,4 @@
 | 14:50 | Session end: 37 writes across 9 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 5 reads | ~21428 tok |
 | 14:56 | Edited src-tauri/tauri.conf.json | 4→4 lines | ~26 |
 | 15:12 | OSS polish: custom hub icon (logo.svg+tray+full icon set), rewritten README w/ badges, LICENSE(MIT), CI for CLI+TUI(pty)+GUI(build), Homebrew cask+release tap-automation+PUBLISHING.md; fixed all clippy/fmt + 12 svelte-check errors | README.md, LICENSE, docs/, packaging/, .github/workflows/*, src-tauri/icons/*, frontend *.svelte, Cargo/tauri/vite configs | all CI gates green locally: fmt+clippy clean, 41 tests, npm check 0 err, CLI/TUI smoke pass, tauri build bundles | ~180k |
+| 15:25 | CI green on GitHub (all 5 jobs); fixed 7 agent-detection tests that assumed agents installed (failed on clean runner) | .wolf, agents/{claude,codex}.rs tests | verified empty-HOME -> 41 pass; CI conclusion=success | ~15k |
