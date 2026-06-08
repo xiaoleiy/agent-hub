@@ -50,3 +50,9 @@
 | 23:45 | Edited src-tauri/src/tui/mod.rs | modified draw_agent_tab() | ~401 |
 | 23:45 | Edited src-tauri/src/tui/mod.rs | modified draw_rate_limits() | ~1075 |
 | 23:45 | Edited src-tauri/src/tui/mod.rs | removed 15 lines | ~12 |
+| 23:47 | Session end: 21 writes across 8 files (types.rs, claude.rs, codex.rs, mod.rs, cursor.rs) | 7 reads | ~35873 tok |
+
+## Session: 2026-06-08 10:04
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
