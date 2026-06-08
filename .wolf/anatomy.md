@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T08:58:04.023Z
-> Files: 116 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T13:19:27.468Z
+> Files: 117 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -185,12 +185,12 @@
 
 ## src-tauri/src/cli/
 
-- `handlers.rs` — status, network, agents, sessions, usage (~3096 tok)
-- `mod.rs` — Show system status (CPU, RAM, uptime, network) (~729 tok)
+- `handlers.rs` — status, network, agents, sessions, usage (~3145 tok)
+- `mod.rs` — Show system status (CPU, RAM, uptime, network) (~736 tok)
 
 ## src-tauri/src/commands/
 
-- `agents.rs` — [tauri::command] (~500 tok)
+- `agents.rs` — [tauri::command] (~545 tok)
 - `keepalive.rs` — [tauri::command] (~116 tok)
 - `mod.rs` (~24 tok)
 - `network.rs` — [tauri::command] (~70 tok)
@@ -211,12 +211,13 @@
 - `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~6012 tok)
 - `cursor_cookies.rs` — Best-effort extraction of the Cursor session cookie (~2878 tok)
 - `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4642 tok)
-- `mod.rs` — Detect all agents and return their info (~345 tok)
+- `mod.rs` — Detect all agents and return their info (~404 tok)
+- `opencode.rs` — OpenCode keeps everything in one SQLite DB under the XDG data dir. (~4238 tok)
 
 ## src-tauri/src/models/
 
 - `mod.rs` (~5 tok)
-- `types.rs` — System status information (~1615 tok)
+- `types.rs` — System status information (~1619 tok)
 
 ## src-tauri/src/tui/
 

@@ -70,6 +70,7 @@ pub enum AgentType {
     ClaudeCode,
     Cursor,
     Codex,
+    OpenCode,
 }
 
 /// A single agent session

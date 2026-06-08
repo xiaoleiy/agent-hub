@@ -12,6 +12,7 @@ pub fn get_agent_sessions(agent: String) -> Vec<Session> {
         "Claude Code" | "claude" => AgentType::ClaudeCode,
         "Cursor" | "cursor" => AgentType::Cursor,
         "Codex" | "codex" => AgentType::Codex,
+        "OpenCode" | "opencode" => AgentType::OpenCode,
         _ => return vec![],
     };
     agents::get_sessions(&agent_type)
@@ -23,6 +24,7 @@ pub fn get_agent_usage(agent: String, window: Option<String>) -> UsageStats {
         "Claude Code" | "claude" => AgentType::ClaudeCode,
         "Cursor" | "cursor" => AgentType::Cursor,
         "Codex" | "codex" => AgentType::Codex,
+        "OpenCode" | "opencode" => AgentType::OpenCode,
         _ => {
             return UsageStats {
                 agent,
@@ -43,6 +45,7 @@ pub fn get_agent_rich_usage(agent: String) -> AgentUsage {
         "Claude Code" | "claude" => AgentType::ClaudeCode,
         "Cursor" | "cursor" => AgentType::Cursor,
         "Codex" | "codex" => AgentType::Codex,
+        "OpenCode" | "opencode" => AgentType::OpenCode,
         _ => {
             return AgentUsage {
                 agent,

@@ -186,3 +186,21 @@
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
 | 17:29 | Cut v0.2.0: bumped manifests, responsive frontend (auto-fit grids @ 500x680), tagged+built draft release (both arch, valid sig, menu-bar app). update-tap auto-bumps cask+formula on publish (TAP token set) | tauri.conf/package.json/Cargo.toml, +page.svelte, AgentTab.svelte | release CI success; v0.2.0 draft has correct assets | ~12k |
+
+## Session: 2026-06-08 20:43
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 21:17 | Created src-tauri/src/core_modules/agents/opencode.rs | — | ~4238 |
+| 21:17 | Edited src-tauri/src/models/types.rs | 5→6 lines | ~20 |
+| 21:17 | Edited src-tauri/src/core_modules/agents/mod.rs | 4→5 lines | ~24 |
+| 21:17 | Edited src-tauri/src/core_modules/agents/mod.rs | 1→6 lines | ~32 |
+| 21:17 | Edited src-tauri/src/core_modules/agents/mod.rs | 2→3 lines | ~31 |
+| 21:17 | Edited src-tauri/src/core_modules/agents/mod.rs | 2→3 lines | ~32 |
+| 21:17 | Edited src-tauri/src/core_modules/agents/mod.rs | 2→3 lines | ~32 |
+| 21:17 | Edited src-tauri/src/cli/handlers.rs | 2→3 lines | ~30 |
+| 21:17 | Edited src-tauri/src/commands/agents.rs | 2→3 lines | ~31 |
+| 21:18 | Edited src-tauri/src/core_modules/agents/opencode.rs | inline fix | ~20 |
+| 21:19 | Edited src-tauri/src/cli/mod.rs | 3→3 lines | ~32 |
+| 21:20 | Added OpenCode as 4th agent (full parity) — verified live: v1.16.2, 3 sessions, token+model breakdown | opencode.rs + 5 wiring files | 47 tests pass, fmt+clippy clean | ~6000 |
+| 21:21 | Session end: 11 writes across 5 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 6 reads | ~17142 tok |

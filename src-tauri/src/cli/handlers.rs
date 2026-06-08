@@ -7,6 +7,7 @@ fn parse_agent(name: &str) -> Option<AgentType> {
         "claude" | "claude code" => Some(AgentType::ClaudeCode),
         "cursor" => Some(AgentType::Cursor),
         "codex" => Some(AgentType::Codex),
+        "opencode" => Some(AgentType::OpenCode),
         _ => None,
     }
 }

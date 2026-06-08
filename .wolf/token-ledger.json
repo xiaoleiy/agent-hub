@@ -2,14 +2,14 @@
   "version": 1,
   "created_at": "2026-06-07T15:20:13.127Z",
   "lifetime": {
-    "total_tokens_estimated": 451538,
-    "total_reads": 135,
-    "total_writes": 511,
-    "total_sessions": 7,
-    "anatomy_hits": 115,
+    "total_tokens_estimated": 476652,
+    "total_reads": 144,
+    "total_writes": 522,
+    "total_sessions": 8,
+    "anatomy_hits": 124,
     "anatomy_misses": 20,
     "repeated_reads_blocked": 37,
-    "estimated_savings_vs_bare_cli": 135310
+    "estimated_savings_vs_bare_cli": 137110
   },
   "sessions": [
     {
@@ -3713,6 +3713,148 @@
         "reads_count": 10,
         "writes_count": 44,
         "repeated_reads_blocked": 5,
+        "anatomy_lookups": 6
+      }
+    },
+    {
+      "id": "session-2026-06-08-2043",
+      "started": "2026-06-08T12:43:48.302Z",
+      "ended": "2026-06-08T13:07:17.249Z",
+      "reads": [
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs",
+          "tokens_estimated": 345,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/models/types.rs",
+          "tokens_estimated": 1615,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/codex.rs",
+          "tokens_estimated": 6012,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        }
+      ],
+      "writes": [],
+      "totals": {
+        "input_tokens_estimated": 7972,
+        "output_tokens_estimated": 0,
+        "reads_count": 3,
+        "writes_count": 0,
+        "repeated_reads_blocked": 0,
+        "anatomy_lookups": 3
+      }
+    },
+    {
+      "id": "session-2026-06-08-2043",
+      "started": "2026-06-08T12:43:48.302Z",
+      "ended": "2026-06-08T13:21:56.161Z",
+      "reads": [
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs",
+          "tokens_estimated": 345,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/models/types.rs",
+          "tokens_estimated": 1615,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/codex.rs",
+          "tokens_estimated": 6012,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/commands/agents.rs",
+          "tokens_estimated": 500,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/cli/handlers.rs",
+          "tokens_estimated": 3096,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/cli/mod.rs",
+          "tokens_estimated": 729,
+          "was_repeated": false,
+          "anatomy_had_description": false
+        }
+      ],
+      "writes": [
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/opencode.rs",
+          "tokens_estimated": 4541,
+          "action": "create"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/models/types.rs",
+          "tokens_estimated": 22,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs",
+          "tokens_estimated": 26,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs",
+          "tokens_estimated": 35,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs",
+          "tokens_estimated": 33,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs",
+          "tokens_estimated": 34,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs",
+          "tokens_estimated": 34,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/cli/handlers.rs",
+          "tokens_estimated": 32,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/commands/agents.rs",
+          "tokens_estimated": 33,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/opencode.rs",
+          "tokens_estimated": 21,
+          "action": "edit"
+        },
+        {
+          "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/cli/mod.rs",
+          "tokens_estimated": 34,
+          "action": "edit"
+        }
+      ],
+      "totals": {
+        "input_tokens_estimated": 12297,
+        "output_tokens_estimated": 4845,
+        "reads_count": 6,
+        "writes_count": 11,
+        "repeated_reads_blocked": 0,
         "anatomy_lookups": 6
       }
     }

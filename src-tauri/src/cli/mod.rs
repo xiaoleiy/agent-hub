@@ -38,7 +38,7 @@ pub enum Commands {
 
     /// Show active sessions
     Sessions {
-        /// Filter by agent name (claude, cursor, codex)
+        /// Filter by agent name (claude, cursor, codex, opencode)
         #[arg(long)]
         agent: Option<String>,
         /// Output as JSON

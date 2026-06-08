@@ -2,12 +2,18 @@ pub mod claude;
 pub mod codex;
 pub mod cursor;
 pub mod cursor_cookies;
+pub mod opencode;
 
 use crate::models::types::{AgentInfo, AgentType, AgentUsage, Session, UsageStats};
 
 /// Detect all agents and return their info
 pub fn detect_all_agents() -> Vec<AgentInfo> {
-    vec![claude::detect(), cursor::detect(), codex::detect()]
+    vec![
+        claude::detect(),
+        cursor::detect(),
+        codex::detect(),
+        opencode::detect(),
+    ]
 }
 
 /// Get sessions for a specific agent type
@@ -16,6 +22,7 @@ pub fn get_sessions(agent_type: &AgentType) -> Vec<Session> {
         AgentType::ClaudeCode => claude::get_sessions(),
         AgentType::Cursor => cursor::get_sessions(),
         AgentType::Codex => codex::get_sessions(),
+        AgentType::OpenCode => opencode::get_sessions(),
     }
 }
 
@@ -25,6 +32,7 @@ pub fn get_usage(agent_type: &AgentType, window: &str) -> UsageStats {
         AgentType::ClaudeCode => claude::get_usage(window),
         AgentType::Cursor => cursor::get_usage(window),
         AgentType::Codex => codex::get_usage(window),
+        AgentType::OpenCode => opencode::get_usage(window),
     }
 }
 
@@ -34,5 +42,6 @@ pub fn get_rich_usage(agent_type: &AgentType) -> AgentUsage {
         AgentType::ClaudeCode => claude::get_rich_usage(),
         AgentType::Cursor => cursor::get_rich_usage(),
         AgentType::Codex => codex::get_rich_usage(),
+        AgentType::OpenCode => opencode::get_rich_usage(),
     }
 }
