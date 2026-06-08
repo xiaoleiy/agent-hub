@@ -685,19 +685,19 @@ mod tests {
 
     #[test]
     fn test_claude_binary_exists() {
+        // Env-dependent: Claude may not be installed (e.g. CI). Only verify the
+        // path resolves to something when it is present.
         let claude_bin = home().join(".local/bin/claude");
-        assert!(
-            claude_bin.exists(),
-            "claude binary should exist at {:?}",
-            claude_bin
-        );
+        if claude_bin.exists() {
+            assert!(claude_bin.is_file() || claude_bin.is_symlink());
+        }
     }
 
     #[test]
     fn test_claude_cli_version_format() {
-        let version = get_claude_cli_version();
-        assert!(version.is_some(), "claude -v should return a value");
-        let v = version.unwrap();
+        let Some(v) = get_claude_cli_version() else {
+            return; // not installed (e.g. CI)
+        };
         // Should be like "2.1.168"
         let parts: Vec<&str> = v.split('.').collect();
         assert!(
@@ -720,14 +720,14 @@ mod tests {
         let info = detect();
         assert_eq!(info.name, "Claude Code");
         assert_eq!(info.agent_type, AgentType::ClaudeCode);
-        // CLI version should be present since claude is installed
-        assert!(info.cli_version.is_some(), "cli_version should be set");
     }
 
     #[test]
     fn test_sessions_dir_exists() {
-        let dir = sessions_dir();
-        assert!(dir.exists(), "sessions directory should exist at {:?}", dir);
+        // The dir may not exist on a clean machine; verify the path shape and
+        // that reading sessions never panics regardless.
+        assert!(sessions_dir().ends_with("sessions"));
+        let _ = get_sessions();
     }
 
     #[test]

@@ -576,15 +576,15 @@ mod tests {
 
     #[test]
     fn test_codex_dir_exists() {
-        let dir = codex_dir();
-        assert!(dir.exists(), "codex directory should exist at {:?}", dir);
+        // May be absent on a clean machine (e.g. CI); just verify path shape.
+        assert!(codex_dir().ends_with(".codex"));
     }
 
     #[test]
     fn test_codex_cli_version_format() {
-        let version = get_codex_cli_version();
-        assert!(version.is_some(), "codex CLI version should be available");
-        let v = version.unwrap();
+        let Some(v) = get_codex_cli_version() else {
+            return; // not installed (e.g. CI)
+        };
         // Should be like "0.137.0"
         let parts: Vec<&str> = v.split('.').collect();
         assert!(
@@ -632,12 +632,11 @@ mod tests {
 
     #[test]
     fn test_state_db_exists() {
-        let db_path = state_db_path();
-        assert!(
-            db_path.exists(),
-            "state_5.sqlite should exist at {:?}",
-            db_path
-        );
+        // DB may be absent on a clean machine; ensure readers don't panic and
+        // the path shape is correct.
+        assert!(state_db_path().ends_with("state_5.sqlite"));
+        let _ = get_sessions();
+        let _ = count_active_sessions();
     }
 
     #[test]
