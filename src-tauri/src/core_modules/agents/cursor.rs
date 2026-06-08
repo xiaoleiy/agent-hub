@@ -41,7 +41,11 @@ pub fn detect() -> AgentInfo {
     let running = is_cursor_running();
 
     // Count recent sessions from DB as GUI sessions
-    let gui_sessions = if running { count_active_conversations() } else { 0 };
+    let gui_sessions = if running {
+        count_active_conversations()
+    } else {
+        0
+    };
 
     let cli_version = get_cursor_cli_version();
     let gui_version = get_cursor_gui_version();
@@ -100,10 +104,11 @@ fn count_active_conversations() -> usize {
     if !db_path.exists() {
         return 0;
     }
-    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
-        Ok(c) => c,
-        Err(_) => return 0,
-    };
+    let conn =
+        match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
     // conversation_summaries has `updatedAt` (epoch millis), not `timestamp`.
     // Count conversations active in the last hour. Don't fabricate a count on
     // failure — return 0 rather than a fake "1".
@@ -146,17 +151,11 @@ fn get_cursor_cli_version() -> Option<String> {
             "cursor-agent".to_string(),
         ]
     } else {
-        vec![
-            "cursor-agent".to_string(),
-            "cursor-agent".to_string(),
-        ]
+        vec!["cursor-agent".to_string(), "cursor-agent".to_string()]
     };
 
     for cmd in &attempts {
-        if let Ok(output) = std::process::Command::new(cmd)
-            .arg("--version")
-            .output()
-        {
+        if let Ok(output) = std::process::Command::new(cmd).arg("--version").output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let first_line = stdout.lines().next().unwrap_or("").trim();
@@ -179,10 +178,11 @@ pub fn get_sessions() -> Vec<Session> {
         return vec![];
     }
 
-    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
-        Ok(c) => c,
-        Err(_) => return vec![],
-    };
+    let conn =
+        match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
 
     // Real columns are conversationId, model, mode, updatedAt (epoch millis).
     // There is no `source`/`timestamp` column — the old query errored and the
@@ -226,8 +226,8 @@ pub fn get_sessions() -> Vec<Session> {
 pub fn get_usage(window: &str) -> UsageStats {
     let db_path = tracking_db_path();
     let window_secs = window_seconds(window);
-    let cutoff_ts = (Utc::now().timestamp_millis() as u64)
-        .saturating_sub(window_secs * 1000) as i64;
+    let cutoff_ts =
+        (Utc::now().timestamp_millis() as u64).saturating_sub(window_secs * 1000) as i64;
 
     let mut total = 0usize;
     let mut conversations = std::collections::HashSet::new();
@@ -236,9 +236,9 @@ pub fn get_usage(window: &str) -> UsageStats {
         if let Ok(conn) =
             Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         {
-            if let Ok(mut stmt) = conn.prepare(
-                "SELECT conversationId FROM ai_code_hashes WHERE timestamp >= ?1",
-            ) {
+            if let Ok(mut stmt) =
+                conn.prepare("SELECT conversationId FROM ai_code_hashes WHERE timestamp >= ?1")
+            {
                 if let Ok(rows) = stmt.query_map([cutoff_ts], |row| {
                     let conv_id: String = row.get(0).unwrap_or_default();
                     Ok(conv_id)
@@ -281,7 +281,9 @@ pub fn get_rich_usage() -> AgentUsage {
     let mut total_interactions = 0usize;
 
     if db_path.exists() {
-        if let Ok(conn) = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        if let Ok(conn) =
+            Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        {
             // Count distinct conversations
             if let Ok(count) = conn.query_row(
                 "SELECT COUNT(DISTINCT conversationId) FROM conversation_summaries",
@@ -291,11 +293,9 @@ pub fn get_rich_usage() -> AgentUsage {
                 total_sessions = count;
             }
             // Count total interactions from ai_code_hashes
-            if let Ok(count) = conn.query_row(
-                "SELECT COUNT(*) FROM ai_code_hashes",
-                [],
-                |row| row.get::<_, usize>(0),
-            ) {
+            if let Ok(count) = conn.query_row("SELECT COUNT(*) FROM ai_code_hashes", [], |row| {
+                row.get::<_, usize>(0)
+            }) {
                 total_interactions = count;
             }
         }
@@ -342,8 +342,9 @@ struct UsageBlock {
 }
 
 // Network call — cache 60s (get_rich_usage runs every few seconds on the tab).
-static CURSOR_RL_CACHE: Mutex<Option<(Instant, Option<RateWindow>, Option<RateWindow>)>> =
-    Mutex::new(None);
+type RateLimitCache = Option<(Instant, Option<RateWindow>, Option<RateWindow>)>;
+
+static CURSOR_RL_CACHE: Mutex<RateLimitCache> = Mutex::new(None);
 
 fn fetch_cursor_rate_limits() -> (Option<RateWindow>, Option<RateWindow>) {
     // Off by default: the only way to read Cursor's server-side limits is its
@@ -400,7 +401,10 @@ fn fetch_cursor_rate_limits_uncached() -> (Option<RateWindow>, Option<RateWindow
         Some(s) => s,
         None => return (None, None),
     };
-    let resets = summary.billing_cycle_end.as_ref().and_then(parse_cursor_reset);
+    let resets = summary
+        .billing_cycle_end
+        .as_ref()
+        .and_then(parse_cursor_reset);
     let individual = match summary.individual_usage {
         Some(i) => i,
         None => return (None, None),
@@ -460,7 +464,11 @@ mod tests {
         if let Some(v) = version {
             // Should be a date-based version like "2026.06.04-5fd875e"
             assert!(v.contains('.'), "version should contain dots: {}", v);
-            assert!(!v.contains('\n'), "version should not contain newlines: {}", v);
+            assert!(
+                !v.contains('\n'),
+                "version should not contain newlines: {}",
+                v
+            );
             // Should NOT be the GUI version "3.7.12"
             assert_ne!(v, "3.7.12", "CLI version should not be the GUI version");
         }
@@ -472,8 +480,14 @@ mod tests {
         let version = get_cursor_gui_version();
         if let Some(v) = version {
             // GUI version should be like "3.7.12"
-            assert!(v.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false),
-                "GUI version should start with a digit: {}", v);
+            assert!(
+                v.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false),
+                "GUI version should start with a digit: {}",
+                v
+            );
         }
     }
 
@@ -482,10 +496,17 @@ mod tests {
         let cli = get_cursor_cli_version();
         if let Some(v) = cli {
             // CLI version should be date-based like "2026.06.04-5fd875e", not semver like "3.7.12"
-            assert!(v.contains('-') && v.contains('.'),
-                "CLI version should be date-based (YYYY.MM.DD-hash), got: {}", v);
+            assert!(
+                v.contains('-') && v.contains('.'),
+                "CLI version should be date-based (YYYY.MM.DD-hash), got: {}",
+                v
+            );
             // Should NOT be the GUI semver version
-            assert_ne!(v, "3.7.12", "CLI version should not be the GUI version 3.7.12, got: {}", v);
+            assert_ne!(
+                v, "3.7.12",
+                "CLI version should not be the GUI version 3.7.12, got: {}",
+                v
+            );
         }
         // If cursor-agent is not installed, None is acceptable
     }
@@ -501,7 +522,10 @@ mod tests {
         }
         // GUI version should be available wherever Cursor.app is installed
         if cursor_app_path().is_some() {
-            assert!(info.gui_version.is_some(), "GUI version should be set when Cursor.app exists");
+            assert!(
+                info.gui_version.is_some(),
+                "GUI version should be set when Cursor.app exists"
+            );
         }
     }
 

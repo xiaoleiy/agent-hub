@@ -74,7 +74,9 @@ pub fn start_keepalive(mode: &str) -> Result<(), String> {
         cmd.arg("-t").arg(secs);
     }
 
-    let child = cmd.spawn().map_err(|e| format!("Failed to start caffeinate: {}", e))?;
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to start caffeinate: {}", e))?;
 
     let pid = child.id();
     let now = chrono::Utc::now().to_rfc3339();
@@ -140,7 +142,11 @@ fn is_caffeinate(pid: u32) -> bool {
     Command::new("ps")
         .args(["-p", &pid.to_string(), "-o", "comm="])
         .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().ends_with("caffeinate"))
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .trim()
+                .ends_with("caffeinate")
+        })
         .unwrap_or(false)
 }
 
@@ -182,7 +188,11 @@ pub fn get_keepalive_status() -> KeepAliveStatus {
     KeepAliveStatus {
         active: state.active,
         mode: if state.active { Some(state.mode) } else { None },
-        started_at: if state.active { Some(state.started_at) } else { None },
+        started_at: if state.active {
+            Some(state.started_at)
+        } else {
+            None
+        },
         expires_at: state.expires_at,
         pid: state.pid,
     }

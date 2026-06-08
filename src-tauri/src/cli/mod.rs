@@ -3,7 +3,11 @@ pub mod handlers;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "agent-hub", version, about = "Manage AI coding agents on your machine")]
+#[command(
+    name = "agent-hub",
+    version,
+    about = "Manage AI coding agents on your machine"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,

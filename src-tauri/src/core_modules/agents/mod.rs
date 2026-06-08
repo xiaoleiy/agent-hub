@@ -7,11 +7,7 @@ use crate::models::types::{AgentInfo, AgentType, AgentUsage, Session, UsageStats
 
 /// Detect all agents and return their info
 pub fn detect_all_agents() -> Vec<AgentInfo> {
-    vec![
-        claude::detect(),
-        cursor::detect(),
-        codex::detect(),
-    ]
+    vec![claude::detect(), cursor::detect(), codex::detect()]
 }
 
 /// Get sessions for a specific agent type

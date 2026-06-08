@@ -11,6 +11,41 @@
       "count": 2,
       "tokens": 5861,
       "first_read": "2026-06-08T06:38:32.341Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/.github/workflows/ci.yml": {
+      "count": 3,
+      "tokens": 518,
+      "first_read": "2026-06-08T06:47:42.392Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/.github/workflows/release.yml": {
+      "count": 2,
+      "tokens": 697,
+      "first_read": "2026-06-08T06:47:43.327Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/tauri.conf.json": {
+      "count": 2,
+      "tokens": 356,
+      "first_read": "2026-06-08T06:47:43.408Z"
+    },
+    "/tmp/logo1024.png": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-08T06:56:11.329Z"
+    },
+    "/tmp/tray_preview.png": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-08T06:56:28.545Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/packaging/homebrew/update-tap-job.yml": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-08T06:57:09.587Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/docs/screenshots/tui.png": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-08T07:11:38.107Z"
     }
   },
   "files_written": [
@@ -229,6 +264,18 @@
       "action": "edit",
       "tokens": 158,
       "at": "2026-06-08T06:41:02.323Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/LICENSE",
+      "action": "create",
+      "tokens": 305,
+      "at": "2026-06-08T06:50:28.164Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/tauri.conf.json",
+      "action": "edit",
+      "tokens": 26,
+      "at": "2026-06-08T06:56:07.017Z"
     }
   ],
   "edit_counts": {
@@ -240,11 +287,13 @@
     "src-tauri/Cargo.toml": 3,
     "src-tauri/src/core_modules/agents/cursor_cookies.rs": 2,
     "src-tauri/src/core_modules/agents/mod.rs": 1,
-    "src-tauri/src/core_modules/agents/cursor.rs": 5
+    "src-tauri/src/core_modules/agents/cursor.rs": 5,
+    "LICENSE": 1,
+    "src-tauri/tauri.conf.json": 1
   },
-  "anatomy_hits": 2,
-  "anatomy_misses": 0,
-  "repeated_reads_warned": 1,
+  "anatomy_hits": 5,
+  "anatomy_misses": 4,
+  "repeated_reads_warned": 5,
   "cerebrum_warnings": 0,
-  "stop_count": 5
+  "stop_count": 7
 }

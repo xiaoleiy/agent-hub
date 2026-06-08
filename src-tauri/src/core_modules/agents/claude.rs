@@ -99,7 +99,12 @@ pub fn detect() -> AgentInfo {
         cli_version,
         gui_version,
         install_path: if installed {
-            Some(home().join(".local/bin/claude").to_string_lossy().to_string())
+            Some(
+                home()
+                    .join(".local/bin/claude")
+                    .to_string_lossy()
+                    .to_string(),
+            )
         } else {
             None
         },
@@ -156,7 +161,10 @@ fn which_claude() -> bool {
 fn get_claude_cli_version() -> Option<String> {
     // Prefer `claude` on PATH (what the user actually runs). The ~/.local/bin
     // symlink can point at an older installed version, so it's only a fallback.
-    let local_bin = home().join(".local/bin/claude").to_string_lossy().to_string();
+    let local_bin = home()
+        .join(".local/bin/claude")
+        .to_string_lossy()
+        .to_string();
     for cmd in ["claude".to_string(), local_bin] {
         if let Ok(output) = std::process::Command::new(&cmd).arg("-v").output() {
             if output.status.success() {
@@ -425,8 +433,7 @@ fn collect_jsonl_tokens(
                 tokens.cache_read_tokens += agg.cache_read;
                 tokens.cache_create_tokens += agg.cache_create;
                 tokens.output_tokens += agg.output;
-                tokens.total_tokens +=
-                    agg.input + agg.cache_read + agg.cache_create + agg.output;
+                tokens.total_tokens += agg.input + agg.cache_read + agg.cache_create + agg.output;
                 for (model, inp, out, count) in agg.models {
                     let e = model_map.entry(model).or_insert((0, 0, 0));
                     e.0 += inp;
@@ -568,7 +575,12 @@ fn claude_oauth_token() -> Option<String> {
 
     // Keychain fallback (best-effort; may be unavailable without prompt approval).
     if let Ok(out) = std::process::Command::new("security")
-        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
+        .args([
+            "find-generic-password",
+            "-s",
+            "Claude Code-credentials",
+            "-w",
+        ])
         .output()
     {
         if out.status.success() {
@@ -594,8 +606,9 @@ struct OAuthWindow {
 
 // The OAuth usage endpoint is rate-limited by Anthropic, and get_rich_usage is
 // called every few seconds while the Claude tab is open — cache for 60s.
-static CLAUDE_RL_CACHE: Mutex<Option<(Instant, Option<RateWindow>, Option<RateWindow>)>> =
-    Mutex::new(None);
+type RateLimitCache = Option<(Instant, Option<RateWindow>, Option<RateWindow>)>;
+
+static CLAUDE_RL_CACHE: Mutex<RateLimitCache> = Mutex::new(None);
 
 /// (session_window, weekly_window) from the OAuth usage endpoint. Cached 60s.
 fn fetch_claude_rate_limits() -> (Option<RateWindow>, Option<RateWindow>) {
@@ -673,7 +686,11 @@ mod tests {
     #[test]
     fn test_claude_binary_exists() {
         let claude_bin = home().join(".local/bin/claude");
-        assert!(claude_bin.exists(), "claude binary should exist at {:?}", claude_bin);
+        assert!(
+            claude_bin.exists(),
+            "claude binary should exist at {:?}",
+            claude_bin
+        );
     }
 
     #[test]
@@ -683,10 +700,18 @@ mod tests {
         let v = version.unwrap();
         // Should be like "2.1.168"
         let parts: Vec<&str> = v.split('.').collect();
-        assert!(parts.len() >= 2, "version should have at least major.minor: {}", v);
+        assert!(
+            parts.len() >= 2,
+            "version should have at least major.minor: {}",
+            v
+        );
         for part in &parts {
-            assert!(part.chars().all(|c| c.is_ascii_digit()),
-                "version part should be numeric: {} in {}", part, v);
+            assert!(
+                part.chars().all(|c| c.is_ascii_digit()),
+                "version part should be numeric: {} in {}",
+                part,
+                v
+            );
         }
     }
 
@@ -720,7 +745,11 @@ mod tests {
         let sess: ClaudeSession = serde_json::from_str(json).unwrap();
         assert_eq!(sess.pid, 12345);
         assert_eq!(sess.session_id, "abc", "sessionId must map to session_id");
-        assert_eq!(sess.started_at, Some(1000), "startedAt must map to started_at");
+        assert_eq!(
+            sess.started_at,
+            Some(1000),
+            "startedAt must map to started_at"
+        );
         assert_eq!(sess.version, "2.1.168");
         assert_eq!(sess.entrypoint, "cli");
     }
@@ -731,7 +760,10 @@ mod tests {
         let json = r#"{"display":"/ide","timestamp":1772699516370,"sessionId":"8e4a29cf"}"#;
         let entry: HistoryEntry = serde_json::from_str(json).unwrap();
         assert_eq!(entry.timestamp, 1772699516370);
-        assert_eq!(entry.session_id, "8e4a29cf", "sessionId must map to session_id");
+        assert_eq!(
+            entry.session_id, "8e4a29cf",
+            "sessionId must map to session_id"
+        );
     }
 
     #[test]

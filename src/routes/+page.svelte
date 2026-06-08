@@ -9,10 +9,11 @@
 
   let systemStatus = $state(null);
   let networkInfo = $state(null);
-  let agents = $state([]);
+  let agents = $state(/** @type {any[]} */ ([]));
   let keepAliveStatus = $state(null);
   let activeTab = $state(0);
 
+  /** @type {ReturnType<typeof setInterval> | undefined} */
   let pollInterval;
   let networkLoaded = false;
 

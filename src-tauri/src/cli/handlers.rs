@@ -42,20 +42,9 @@ pub fn status(json: bool) {
         "Uptime:".dimmed(),
         status.uptime_formatted.cyan()
     );
-    println!(
-        "  {} {}",
-        "User:".dimmed(),
-        status.username.cyan()
-    );
-    println!(
-        "  {} {}",
-        "Host:".dimmed(),
-        status.hostname.cyan()
-    );
-    println!(
-        "  {}",
-        "Traffic:".dimmed()
-    );
+    println!("  {} {}", "User:".dimmed(), status.username.cyan());
+    println!("  {} {}", "Host:".dimmed(), status.hostname.cyan());
+    println!("  {}", "Traffic:".dimmed());
     println!(
         "    {} {}",
         "↑ Upload:".dimmed(),
@@ -82,11 +71,7 @@ pub fn network(json: bool) {
             println!("{}", "Network Information".bold().underline());
             println!("  {} {}", "IP:".dimmed(), info.ip.green().bold());
             if !info.country.is_empty() {
-                println!(
-                    "  {} {}",
-                    "Location:".dimmed(),
-                    format!("{}, {}", info.city, info.region)
-                );
+                println!("  {} {}, {}", "Location:".dimmed(), info.city, info.region);
             }
             if !info.org.is_empty() {
                 println!("  {} {}", "ISP:".dimmed(), info.org);
@@ -96,7 +81,11 @@ pub fn network(json: bool) {
             }
         }
         Err(e) => {
-            eprintln!("{} Failed to fetch network info: {}", "Error:".red().bold(), e);
+            eprintln!(
+                "{} Failed to fetch network info: {}",
+                "Error:".red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     }
@@ -167,7 +156,12 @@ pub fn agents(json: bool) {
                     .as_deref()
                     .map(|o| format!(" ({})", o))
                     .unwrap_or_default();
-                println!("      {} {}{}", "Account:".dimmed(), who.green(), org.dimmed());
+                println!(
+                    "      {} {}{}",
+                    "Account:".dimmed(),
+                    who.green(),
+                    org.dimmed()
+                );
             }
         }
     }
@@ -259,7 +253,9 @@ pub fn usage(window: &str, agent_filter: Option<String>, json: bool) {
 
     println!(
         "{}",
-        format!("Usage Statistics (window: {})", window).bold().underline()
+        format!("Usage Statistics (window: {})", window)
+            .bold()
+            .underline()
     );
 
     for (u, r) in all_usage.iter().zip(all_rich.iter()) {
@@ -270,10 +266,18 @@ pub fn usage(window: &str, agent_filter: Option<String>, json: bool) {
             u.total_interactions.to_string().cyan()
         );
         if let Some(w) = &r.session_window {
-            println!("      {} {}", "Session limit:".dimmed(), format_rate_window(w));
+            println!(
+                "      {} {}",
+                "Session limit:".dimmed(),
+                format_rate_window(w)
+            );
         }
         if let Some(w) = &r.weekly_window {
-            println!("      {} {}", "Weekly limit: ".dimmed(), format_rate_window(w));
+            println!(
+                "      {} {}",
+                "Weekly limit: ".dimmed(),
+                format_rate_window(w)
+            );
         }
         if let Some(t) = &r.tokens {
             println!(

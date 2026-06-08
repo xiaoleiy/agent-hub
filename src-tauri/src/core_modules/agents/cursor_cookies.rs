@@ -51,13 +51,34 @@ struct ChromiumBrowser {
 
 fn chromium_browsers() -> Vec<ChromiumBrowser> {
     vec![
-        ChromiumBrowser { support_subdir: "Google/Chrome", keychain_service: "Chrome Safe Storage" },
-        ChromiumBrowser { support_subdir: "Arc", keychain_service: "Arc Safe Storage" },
-        ChromiumBrowser { support_subdir: "BraveSoftware/Brave-Browser", keychain_service: "Brave Safe Storage" },
-        ChromiumBrowser { support_subdir: "Microsoft Edge", keychain_service: "Microsoft Edge Safe Storage" },
-        ChromiumBrowser { support_subdir: "Vivaldi", keychain_service: "Vivaldi Safe Storage" },
-        ChromiumBrowser { support_subdir: "com.operasoftware.Opera", keychain_service: "Opera Safe Storage" },
-        ChromiumBrowser { support_subdir: "Chromium", keychain_service: "Chromium Safe Storage" },
+        ChromiumBrowser {
+            support_subdir: "Google/Chrome",
+            keychain_service: "Chrome Safe Storage",
+        },
+        ChromiumBrowser {
+            support_subdir: "Arc",
+            keychain_service: "Arc Safe Storage",
+        },
+        ChromiumBrowser {
+            support_subdir: "BraveSoftware/Brave-Browser",
+            keychain_service: "Brave Safe Storage",
+        },
+        ChromiumBrowser {
+            support_subdir: "Microsoft Edge",
+            keychain_service: "Microsoft Edge Safe Storage",
+        },
+        ChromiumBrowser {
+            support_subdir: "Vivaldi",
+            keychain_service: "Vivaldi Safe Storage",
+        },
+        ChromiumBrowser {
+            support_subdir: "com.operasoftware.Opera",
+            keychain_service: "Opera Safe Storage",
+        },
+        ChromiumBrowser {
+            support_subdir: "Chromium",
+            keychain_service: "Chromium Safe Storage",
+        },
     ]
 }
 
@@ -197,7 +218,8 @@ fn firefox_cookie() -> Option<String> {
 fn safari_cookie() -> Option<String> {
     let candidates = [
         home().join("Library/Cookies/Cookies.binarycookies"),
-        home().join("Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies"),
+        home()
+            .join("Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies"),
     ];
     for path in candidates {
         if let Ok(data) = fs::read(&path) {

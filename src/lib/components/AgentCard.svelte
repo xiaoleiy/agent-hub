@@ -1,4 +1,5 @@
 <script>
+  /** @type {{ agent: any }} */
   let { agent } = $props();
 
   const statusColor = $derived(
@@ -12,7 +13,7 @@
         : "Not Found"
   );
 
-  function versionDisplay(agent) {
+  function versionDisplay(/** @type {any} */ agent) {
     const cv = agent.cli_version;
     const gv = agent.gui_version;
     if (cv && gv && cv !== gv) return { cli: cv, gui: gv };

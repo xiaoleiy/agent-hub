@@ -159,3 +159,8 @@
 | 14:39 | Edited src-tauri/src/cli/handlers.rs | modified is_empty() | ~107 |
 | 14:41 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified fetch_cursor_rate_limits() | ~148 |
 | 14:41 | Fixed Codex session overcount (111->active-in-15min by source; Running(idle) status); gated Cursor rate-limits off by default (no non-Keychain zero-setup path; no local API token) | agents/codex.rs, agents/cursor.rs, tui/mod.rs, cli/handlers.rs | 41 tests pass; Codex shows Running(idle); cursor usage no longer prompts | ~20k |
+| 14:42 | Session end: 36 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 2 reads | ~19552 tok |
+| 14:50 | Created LICENSE | — | ~285 |
+| 14:50 | Session end: 37 writes across 9 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 5 reads | ~21428 tok |
+| 14:56 | Edited src-tauri/tauri.conf.json | 4→4 lines | ~26 |
+| 15:12 | OSS polish: custom hub icon (logo.svg+tray+full icon set), rewritten README w/ badges, LICENSE(MIT), CI for CLI+TUI(pty)+GUI(build), Homebrew cask+release tap-automation+PUBLISHING.md; fixed all clippy/fmt + 12 svelte-check errors | README.md, LICENSE, docs/, packaging/, .github/workflows/*, src-tauri/icons/*, frontend *.svelte, Cargo/tauri/vite configs | all CI gates green locally: fmt+clippy clean, 41 tests, npm check 0 err, CLI/TUI smoke pass, tauri build bundles | ~180k |

@@ -1,6 +1,7 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
 
+  /** @type {{ status: any }} */
   let { status } = $props();
 
   const modes = [
@@ -12,7 +13,7 @@
 
   let loading = $state(false);
 
-  async function setMode(mode) {
+  async function setMode(/** @type {string} */ mode) {
     loading = true;
     try {
       if (status?.active && status?.mode === mode) {

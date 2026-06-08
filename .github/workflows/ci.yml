@@ -11,6 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  fmt:
+    name: Format
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
   check:
     name: Check & Lint
     runs-on: macos-latest
@@ -38,7 +51,10 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-check-
+            ${{ runner.os }}-cargo-
 
       - name: Check Rust
         run: cargo check --manifest-path src-tauri/Cargo.toml
@@ -74,7 +90,187 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+            ${{ runner.os }}-cargo-
 
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  cli-tui-smoke:
+    name: CLI & TUI Smoke Tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-smoke-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-smoke-
+            ${{ runner.os }}-cargo-
+
+      # Build the single multi-face binary (bin name "agent-hub").
+      # The CLI/TUI faces are exercised below without bundling the GUI.
+      - name: Build agent-hub binary
+        run: cargo build --manifest-path src-tauri/Cargo.toml --bin agent-hub
+
+      - name: Locate binary
+        id: bin
+        run: echo "path=$PWD/src-tauri/target/debug/agent-hub" >> "$GITHUB_OUTPUT"
+
+      # --- CLI smoke tests -------------------------------------------------
+      # Each command must exit 0 and produce sane output. `set -euo pipefail`
+      # makes any non-zero exit or broken pipe fail the step.
+      - name: CLI smoke - help
+        run: |
+          set -euo pipefail
+          "${{ steps.bin.outputs.path }}" --help
+
+      - name: CLI smoke - status --json has cpu_usage
+        run: |
+          set -euo pipefail
+          out="$("${{ steps.bin.outputs.path }}" status --json)"
+          echo "$out" | jq -e 'has("cpu_usage")' > /dev/null
+          echo "status OK"
+
+      - name: CLI smoke - agents --json is an array
+        run: |
+          set -euo pipefail
+          out="$("${{ steps.bin.outputs.path }}" agents --json)"
+          echo "$out" | jq -e 'type == "array"' > /dev/null
+          echo "agents OK"
+
+      - name: CLI smoke - usage --json is valid JSON
+        run: |
+          set -euo pipefail
+          out="$("${{ steps.bin.outputs.path }}" usage --json)"
+          echo "$out" | jq -e '.' > /dev/null
+          echo "usage OK"
+
+      - name: CLI smoke - network --json is valid JSON
+        run: |
+          set -euo pipefail
+          out="$("${{ steps.bin.outputs.path }}" network --json)"
+          echo "$out" | jq -e '.' > /dev/null
+          echo "network OK"
+
+      - name: CLI smoke - sessions --json is valid JSON
+        run: |
+          set -euo pipefail
+          out="$("${{ steps.bin.outputs.path }}" sessions --json)"
+          echo "$out" | jq -e '.' > /dev/null
+          echo "sessions OK"
+
+      - name: CLI smoke - keepalive --status
+        run: |
+          set -euo pipefail
+          "${{ steps.bin.outputs.path }}" keepalive --status
+
+      # --- TUI smoke test --------------------------------------------------
+      # The ratatui TUI takes over the terminal, so it must run under a real
+      # pseudo-terminal. We drive it with a Python pty: spawn `agent-hub tui`,
+      # wait ~2s for it to render, send 'q' to quit, and assert a clean exit
+      # within a hard timeout so CI can never hang.
+      - name: TUI smoke - starts and quits cleanly
+        env:
+          BIN: ${{ steps.bin.outputs.path }}
+        run: |
+          set -euo pipefail
+          python3 - "$BIN" <<'PY'
+          import os, pty, select, signal, sys, time
+
+          binary = sys.argv[1]
+          DEADLINE = 30.0   # hard wall-clock timeout for the whole test
+          RENDER_WAIT = 2.0 # let the dashboard draw before quitting
+
+          pid, fd = pty.fork()
+          if pid == 0:
+              # Child: become the TUI inside the pty.
+              os.environ["TERM"] = "xterm-256color"
+              os.execv(binary, [binary, "tui"])
+              os._exit(127)
+
+          start = time.time()
+          sent_quit = False
+          try:
+              while True:
+                  if time.time() - start > DEADLINE:
+                      os.kill(pid, signal.SIGKILL)
+                      print("TUI smoke FAILED: did not exit within timeout")
+                      sys.exit(1)
+
+                  # Drain output so the child's write buffer never blocks.
+                  r, _, _ = select.select([fd], [], [], 0.2)
+                  if r:
+                      try:
+                          os.read(fd, 4096)
+                      except OSError:
+                          pass  # pty closed -> child is exiting
+
+                  if not sent_quit and time.time() - start > RENDER_WAIT:
+                      os.write(fd, b"q")  # request quit
+                      sent_quit = True
+
+                  done, status = os.waitpid(pid, os.WNOHANG)
+                  if done == pid:
+                      if os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0:
+                          print("TUI smoke OK: started and quit cleanly")
+                          sys.exit(0)
+                      print(f"TUI smoke FAILED: bad exit status {status}")
+                      sys.exit(1)
+          finally:
+              try:
+                  os.close(fd)
+              except OSError:
+                  pass
+          PY
+
+  gui-build:
+    name: GUI Build (Tauri bundle)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-gui-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-gui-
+            ${{ runner.os }}-cargo-
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # Realistic GUI test: compile and bundle the actual Tauri 2 desktop app
+      # on macOS to verify the SvelteKit frontend builds and the app links and
+      # packages. NOTE: full GUI E2E via WebDriver (tauri-driver) is NOT
+      # supported on macOS because WKWebView has no WebDriver backend
+      # (tauri-driver limitation). We therefore verify a successful build +
+      # bundle plus the frontend `npm run check` (in the check job) instead.
+      - name: Build Tauri GUI app
+        run: npm run tauri build

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T06:41:02.314Z
-> Files: 114 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T06:56:07.009Z
+> Files: 115 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -9,6 +9,7 @@
 - `CLAUDE.md` — OpenWolf (~57 tok)
 - `HANDOFF.md` — Agent Hub — Handoff Document (~1557 tok)
 - `jsconfig.json` (~193 tok)
+- `LICENSE` (~285 tok)
 - `package-lock.json` — npm lock file (~17995 tok)
 - `package.json` — Node.js package manifest (~219 tok)
 - `README.md` — Project documentation (~794 tok)

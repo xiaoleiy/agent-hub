@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a2230"/>
+      <stop offset="1" stop-color="#0c1018"/>
+    </linearGradient>
+    <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#7df0e6"/>
+      <stop offset="0.5" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </radialGradient>
+  </defs>
+
+  <!-- macOS rounded-square background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="url(#bg)"/>
+  <rect x="6" y="6" width="1012" height="1012" rx="220" ry="220" fill="none" stroke="#3a4a5e" stroke-opacity="0.45" stroke-width="3"/>
+
+  <!-- radar / orbit rings -->
+  <g fill="none" stroke="url(#cg)">
+    <circle cx="512" cy="512" r="300" stroke-opacity="0.16" stroke-width="3"/>
+    <circle cx="512" cy="512" r="222" stroke-opacity="0.30" stroke-width="6"/>
+  </g>
+
+  <!-- connection links from hub to satellites -->
+  <g stroke="url(#cg)" stroke-width="20" stroke-linecap="round" stroke-opacity="0.85">
+    <line x1="512" y1="512" x2="512" y2="290"/>
+    <line x1="512" y1="512" x2="704" y2="623"/>
+    <line x1="512" y1="512" x2="320" y2="623"/>
+  </g>
+
+  <!-- satellite agent nodes -->
+  <g>
+    <circle cx="512" cy="290" r="62" fill="#0c1018"/>
+    <circle cx="512" cy="290" r="62" fill="#34d399" fill-opacity="0.18"/>
+    <circle cx="512" cy="290" r="48" fill="#34d399"/>
+
+    <circle cx="704" cy="623" r="62" fill="#0c1018"/>
+    <circle cx="704" cy="623" r="62" fill="#22d3ee" fill-opacity="0.18"/>
+    <circle cx="704" cy="623" r="48" fill="#22d3ee"/>
+
+    <circle cx="320" cy="623" r="62" fill="#0c1018"/>
+    <circle cx="320" cy="623" r="62" fill="#22d3ee" fill-opacity="0.18"/>
+    <circle cx="320" cy="623" r="48" fill="#22d3ee"/>
+  </g>
+
+  <!-- central hub node -->
+  <circle cx="512" cy="512" r="124" fill="#0c1018"/>
+  <circle cx="512" cy="512" r="118" fill="url(#core)"/>
+  <circle cx="512" cy="512" r="58" fill="#0c1018" fill-opacity="0.92"/>
+  <circle cx="512" cy="512" r="26" fill="#7df0e6"/>
+</svg>

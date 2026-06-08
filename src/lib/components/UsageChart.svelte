@@ -1,8 +1,9 @@
 <script>
+  /** @type {{ stats: any[], window: any }} */
   let { stats, window } = $props();
 
   const maxInteractions = $derived(
-    Math.max(...stats.map((s) => s.total_interactions), 1)
+    Math.max(...stats.map((/** @type {any} */ s) => s.total_interactions), 1)
   );
 </script>
 

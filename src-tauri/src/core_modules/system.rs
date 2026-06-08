@@ -132,11 +132,17 @@ mod tests {
         assert!(status.cpu_cores > 0, "should have at least 1 CPU core");
         assert!(status.ram_total_gb > 0.0, "should have some RAM");
         assert!(status.ram_used_gb > 0.0, "should be using some RAM");
-        assert!(status.ram_usage_percent >= 0.0 && status.ram_usage_percent <= 100.0,
-            "RAM usage should be 0-100%: {}", status.ram_usage_percent);
+        assert!(
+            status.ram_usage_percent >= 0.0 && status.ram_usage_percent <= 100.0,
+            "RAM usage should be 0-100%: {}",
+            status.ram_usage_percent
+        );
         assert!(!status.username.is_empty(), "username should not be empty");
         assert!(!status.hostname.is_empty(), "hostname should not be empty");
-        assert!(!status.uptime_formatted.is_empty(), "uptime should not be empty");
+        assert!(
+            !status.uptime_formatted.is_empty(),
+            "uptime should not be empty"
+        );
     }
 
     #[test]
@@ -147,8 +153,14 @@ mod tests {
         // Second call should have rates
         let status = get_system_status();
         // Rates should be non-negative
-        assert!(status.network_upload_rate >= 0.0, "upload rate should be >= 0");
-        assert!(status.network_download_rate >= 0.0, "download rate should be >= 0");
+        assert!(
+            status.network_upload_rate >= 0.0,
+            "upload rate should be >= 0"
+        );
+        assert!(
+            status.network_download_rate >= 0.0,
+            "download rate should be >= 0"
+        );
     }
 
     #[test]

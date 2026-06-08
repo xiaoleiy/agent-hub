@@ -1,15 +1,20 @@
 name: Release
 
+# Tag push -> build macOS bundles and create a DRAFT GitHub Release.
+# When the maintainer PUBLISHES that release -> update the Homebrew tap.
 on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
 jobs:
   build:
+    if: ${{ github.event_name == 'push' }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +51,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -70,21 +75,92 @@ jobs:
             agent-hub status        # System status
             agent-hub agents        # List agents
             agent-hub sessions      # Active sessions
-            agent-hub usage         # Usage stats
+            agent-hub usage         # Usage + rate limits
             agent-hub keepalive 1h  # Prevent sleep for 1 hour
             ```
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
+  # Fires when the drafted release is manually published (not a prerelease).
+  # Requires a TAP_GITHUB_TOKEN secret with write access to xiaoleiy/homebrew-tap.
   update-tap:
-    needs: build
-    runs-on: macos-latest
-    if: "!github.event.release.prerelease"
+    if: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Update Homebrew Tap
+      - name: Resolve version from the published release
+        id: ver
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          echo "TODO: Auto-update homebrew tap with new version SHA256"
-          # This would clone xiaoleiy/homebrew-tap, update Casks/agent-hub.rb
-          # with the new version and SHA256 from the release artifacts,
-          # then commit and push.
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}"          >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}"  >> "$GITHUB_OUTPUT"
+
+      - name: Download release DMGs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "Agent.Hub_${VERSION}_aarch64.dmg" \
+            --pattern "Agent.Hub_${VERSION}_x64.dmg" \
+            --dir dist
+          ls -la dist
+
+      - name: Compute SHA256 checksums
+        id: sha
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          ARM_SHA=$(sha256sum "dist/Agent.Hub_${VERSION}_aarch64.dmg" | cut -d' ' -f1)
+          INTEL_SHA=$(sha256sum "dist/Agent.Hub_${VERSION}_x64.dmg"     | cut -d' ' -f1)
+          echo "arm_sha=${ARM_SHA}"     >> "$GITHUB_OUTPUT"
+          echo "intel_sha=${INTEL_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: xiaoleiy/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Rewrite Casks/agent-hub.rb
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          ARM_SHA: ${{ steps.sha.outputs.arm_sha }}
+          INTEL_SHA: ${{ steps.sha.outputs.intel_sha }}
+        run: |
+          set -euo pipefail
+          CASK="homebrew-tap/Casks/agent-hub.rb"
+          sed -i -E "s|^(\s*version\s+).*|\1\"${VERSION}\"|" "$CASK"
+          awk -v arm="$ARM_SHA" -v intel="$INTEL_SHA" '
+            /^\s*sha256\s+"/ {
+              n++
+              if (n == 1) { sub(/"[0-9a-fA-F]*"/, "\"" arm "\"") }
+              else if (n == 2) { sub(/"[0-9a-fA-F]*"/, "\"" intel "\"") }
+            }
+            { print }
+          ' "$CASK" > "${CASK}.tmp" && mv "${CASK}.tmp" "$CASK"
+          echo "----- updated cask -----"; cat "$CASK"
+
+      - name: Commit and push
+        working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No changes to commit."; exit 0
+          fi
+          git add Casks/agent-hub.rb
+          git commit -m "agent-hub ${VERSION}"
+          git push

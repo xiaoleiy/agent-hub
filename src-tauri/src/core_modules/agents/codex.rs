@@ -1,4 +1,7 @@
-use crate::models::types::{AccountInfo, AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage, UsageStats};
+use crate::models::types::{
+    AccountInfo, AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage,
+    UsageStats,
+};
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
@@ -67,10 +70,10 @@ pub fn detect() -> AgentInfo {
         gui_version,
         install_path: if codex_bin.exists() {
             Some(codex_bin.to_string_lossy().to_string())
-        } else if let Some(ref app) = codex_app {
-            Some(app.to_string_lossy().to_string())
         } else {
-            None
+            codex_app
+                .as_ref()
+                .map(|app| app.to_string_lossy().to_string())
         },
         account: get_account(),
     }
@@ -124,18 +127,18 @@ fn count_active_sessions() -> (usize, usize) {
     if !db_path.exists() {
         return (0, 0);
     }
-    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
-        Ok(c) => c,
-        Err(_) => return (0, 0),
-    };
+    let conn =
+        match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+            Ok(c) => c,
+            Err(_) => return (0, 0),
+        };
     // updated_at is INTEGER epoch seconds — compare against an integer cutoff.
     let cutoff = Utc::now().timestamp() - WINDOW_SECS;
-    let mut stmt = match conn.prepare(
-        "SELECT source FROM threads WHERE archived = 0 AND updated_at >= ?1",
-    ) {
-        Ok(s) => s,
-        Err(_) => return (0, 0),
-    };
+    let mut stmt =
+        match conn.prepare("SELECT source FROM threads WHERE archived = 0 AND updated_at >= ?1") {
+            Ok(s) => s,
+            Err(_) => return (0, 0),
+        };
     let mut cli = 0usize;
     let mut gui = 0usize;
     if let Ok(rows) = stmt.query_map([cutoff], |row| row.get::<_, String>(0)) {
@@ -152,13 +155,18 @@ fn count_active_sessions() -> (usize, usize) {
 fn get_codex_cli_version() -> Option<String> {
     // Prefer the actual installed binary. `codex --version` prints e.g.
     // "codex-cli 0.130.0" — take the first version-looking token.
-    if let Ok(output) = std::process::Command::new("codex").arg("--version").output() {
+    if let Ok(output) = std::process::Command::new("codex")
+        .arg("--version")
+        .output()
+    {
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(tok) = stdout
-                .split_whitespace()
-                .find(|t| t.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
-            {
+            if let Some(tok) = stdout.split_whitespace().find(|t| {
+                t.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+            }) {
                 return Some(tok.to_string());
             }
         }
@@ -202,10 +210,11 @@ pub fn get_sessions() -> Vec<Session> {
         return vec![];
     }
 
-    let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
-        Ok(c) => c,
-        Err(_) => return vec![],
-    };
+    let conn =
+        match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
 
     let mut stmt = match conn.prepare(
         "SELECT id, title, source, model_provider, cwd, created_at, updated_at
@@ -260,9 +269,9 @@ pub fn get_usage(window: &str) -> UsageStats {
         if let Ok(conn) =
             Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         {
-            if let Ok(mut stmt) = conn.prepare(
-                "SELECT id FROM threads WHERE updated_at >= ?1 AND archived = 0",
-            ) {
+            if let Ok(mut stmt) =
+                conn.prepare("SELECT id FROM threads WHERE updated_at >= ?1 AND archived = 0")
+            {
                 if let Ok(rows) = stmt.query_map([cutoff], |_row| Ok(())) {
                     for _ in rows.flatten() {
                         session_count += 1;
@@ -302,7 +311,9 @@ pub fn get_rich_usage() -> AgentUsage {
     // Count sessions from DB
     let mut total_sessions = 0usize;
     if db_path.exists() {
-        if let Ok(conn) = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        if let Ok(conn) =
+            Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        {
             if let Ok(count) = conn.query_row(
                 "SELECT COUNT(*) FROM threads WHERE archived = 0",
                 [],
@@ -507,10 +518,22 @@ fn parse_codex_jsonl(path: &Path) -> CodexFileAgg {
         }
 
         if let Some(total_usage) = payload.pointer("/info/total_token_usage") {
-            let inp = total_usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let cached = total_usage.get("cached_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let out = total_usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let reasoning = total_usage.get("reasoning_output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let inp = total_usage
+                .get("input_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let cached = total_usage
+                .get("cached_input_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let out = total_usage
+                .get("output_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let reasoning = total_usage
+                .get("reasoning_output_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             let reported_total = total_usage.get("total_tokens").and_then(|v| v.as_u64());
 
             // Cumulative — overwrite with the latest event's running totals.
@@ -535,7 +558,10 @@ fn parse_codex_jsonl(path: &Path) -> CodexFileAgg {
 
 fn parse_rate(v: &serde_json::Value, default_minutes: u64) -> RateSnapshotData {
     RateSnapshotData {
-        used_percent: v.get("used_percent").and_then(|x| x.as_f64()).unwrap_or(0.0),
+        used_percent: v
+            .get("used_percent")
+            .and_then(|x| x.as_f64())
+            .unwrap_or(0.0),
         window_minutes: v
             .get("window_minutes")
             .and_then(|x| x.as_u64())
@@ -561,7 +587,11 @@ mod tests {
         let v = version.unwrap();
         // Should be like "0.137.0"
         let parts: Vec<&str> = v.split('.').collect();
-        assert!(parts.len() >= 2, "version should have at least major.minor: {}", v);
+        assert!(
+            parts.len() >= 2,
+            "version should have at least major.minor: {}",
+            v
+        );
     }
 
     #[test]
@@ -569,8 +599,14 @@ mod tests {
         let version = get_codex_desktop_version();
         if let Some(v) = version {
             // Desktop version is like "26.602.40724"
-            assert!(v.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false),
-                "desktop version should start with a digit: {}", v);
+            assert!(
+                v.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false),
+                "desktop version should start with a digit: {}",
+                v
+            );
         }
     }
 
@@ -579,7 +615,11 @@ mod tests {
         let cli = get_codex_cli_version();
         let desktop = get_codex_desktop_version();
         if let (Some(cv), Some(dv)) = (&cli, &desktop) {
-            assert_ne!(cv, dv, "CLI version ({}) should differ from Desktop version ({})", cv, dv);
+            assert_ne!(
+                cv, dv,
+                "CLI version ({}) should differ from Desktop version ({})",
+                cv, dv
+            );
         }
     }
 
@@ -593,7 +633,11 @@ mod tests {
     #[test]
     fn test_state_db_exists() {
         let db_path = state_db_path();
-        assert!(db_path.exists(), "state_5.sqlite should exist at {:?}", db_path);
+        assert!(
+            db_path.exists(),
+            "state_5.sqlite should exist at {:?}",
+            db_path
+        );
     }
 
     #[test]
@@ -602,13 +646,18 @@ mod tests {
         if !db_path.exists() {
             return;
         }
-        let conn = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let conn =
+            Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
         let result = conn.query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='threads'",
             [],
             |row| row.get::<_, i32>(0),
         );
-        assert!(result.unwrap_or(0) > 0, "threads table should exist in state_5.sqlite");
+        assert!(
+            result.unwrap_or(0) > 0,
+            "threads table should exist in state_5.sqlite"
+        );
     }
 
     #[test]
@@ -617,7 +666,9 @@ mod tests {
         if !db_path.exists() {
             return;
         }
-        let conn = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let conn =
+            Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
         // Query to check if source column exists
         let result = conn.prepare("SELECT source FROM threads LIMIT 1");
         assert!(result.is_ok(), "threads table should have 'source' column");
@@ -633,12 +684,17 @@ mod tests {
             if let Ok(conn) =
                 Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
             {
-                if let Ok(total) = conn.query_row(
-                    "SELECT COUNT(*) FROM threads WHERE archived = 0",
-                    [],
-                    |r| r.get::<_, usize>(0),
-                ) {
-                    assert!(cli + gui <= total, "active {} must be <= total {}", cli + gui, total);
+                if let Ok(total) =
+                    conn.query_row("SELECT COUNT(*) FROM threads WHERE archived = 0", [], |r| {
+                        r.get::<_, usize>(0)
+                    })
+                {
+                    assert!(
+                        cli + gui <= total,
+                        "active {} must be <= total {}",
+                        cli + gui,
+                        total
+                    );
                 }
             }
         }

@@ -68,10 +68,7 @@ fn get_active_network_service() -> Option<String> {
 }
 
 /// Parse output of networksetup -getwebproxy / -getsecurewebproxy
-fn read_proxy_entry(
-    service: &str,
-    command: &str,
-) -> crate::models::types::ProxyEntry {
+fn read_proxy_entry(service: &str, command: &str) -> crate::models::types::ProxyEntry {
     let output = Command::new("networksetup")
         .args([format!("-{}", command), service.to_string()])
         .output();
@@ -159,7 +156,11 @@ fn read_pac_proxy(service: &str) -> Option<String> {
         }
     }
 
-    if enabled { url } else { None }
+    if enabled {
+        url
+    } else {
+        None
+    }
 }
 
 /// Read proxy bypass domains
@@ -234,7 +235,7 @@ fn extract_bundle_name(line: &str) -> Option<String> {
             let bundle = &line[bracket_start + colon_pos + 1..];
             let bundle = bundle.trim_end_matches(']');
             // Take last component of bundle ID
-            return bundle.split('.').last().map(|s| s.to_string());
+            return bundle.split('.').next_back().map(|s| s.to_string());
         }
     }
     None
@@ -456,10 +457,7 @@ fn get_clash_nodes(port: u16) -> Vec<ProxyNode> {
     let mut nodes = Vec::new();
 
     for (_name, proxy) in proxies {
-        let proxy_type = proxy
-            .get("type")
-            .and_then(|t| t.as_str())
-            .unwrap_or("");
+        let proxy_type = proxy.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
         // Only show selector/url-test/fallback groups (not individual proxies)
         let is_group = matches!(
@@ -559,9 +557,7 @@ fn get_surge_nodes(port: u16) -> Vec<ProxyNode> {
             .unwrap_or("")
             .to_string();
 
-        let delay = group
-            .get("latency")
-            .and_then(|l| l.as_u64());
+        let delay = group.get("latency").and_then(|l| l.as_u64());
 
         let type_str = group
             .get("type")
@@ -642,7 +638,10 @@ mod tests {
     fn test_get_system_proxy() {
         let proxy = get_system_proxy();
         // Should have a service name
-        assert!(!proxy.active_service.is_empty(), "should have an active service name");
+        assert!(
+            !proxy.active_service.is_empty(),
+            "should have an active service name"
+        );
     }
 
     #[test]

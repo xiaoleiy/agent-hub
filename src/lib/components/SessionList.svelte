@@ -1,16 +1,17 @@
 <script>
+  /** @type {{ sessions: any[] }} */
   let { sessions } = $props();
 
-  function truncateId(id) {
+  function truncateId(/** @type {string} */ id) {
     if (!id) return "";
     return id.length > 16 ? id.slice(0, 16) + "…" : id;
   }
 
-  function relativeTime(isoString) {
+  function relativeTime(/** @type {string} */ isoString) {
     if (!isoString) return "";
     const date = new Date(isoString);
     const now = new Date();
-    const diff = now - date;
+    const diff = now.getTime() - date.getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "just now";
     if (mins < 60) return `${mins}m ago`;

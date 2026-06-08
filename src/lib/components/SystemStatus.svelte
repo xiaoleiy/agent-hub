@@ -1,14 +1,14 @@
 <script>
   let { status } = $props();
 
-  function formatBytes(bytes) {
+  function formatBytes(/** @type {number} */ bytes) {
     if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + " GB";
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + " MB";
     if (bytes >= 1024) return (bytes / 1024).toFixed(2) + " KB";
     return bytes + " B";
   }
 
-  function formatRate(bytesPerSec) {
+  function formatRate(/** @type {number} */ bytesPerSec) {
     if (bytesPerSec >= 1048576) return (bytesPerSec / 1048576).toFixed(2) + " MB/s";
     if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(2) + " KB/s";
     return Math.round(bytesPerSec) + " B/s";
