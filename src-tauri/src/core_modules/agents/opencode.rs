@@ -190,7 +190,7 @@ pub fn get_sessions() -> Vec<Session> {
     let mut stmt = match conn.prepare(
         "SELECT id, title, directory, time_updated
          FROM session WHERE time_archived IS NULL
-         ORDER BY time_updated DESC LIMIT 20",
+         ORDER BY time_updated DESC LIMIT 30",
     ) {
         Ok(s) => s,
         Err(_) => return vec![],

@@ -42,7 +42,7 @@
   .network-info h2 {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-strong);
     margin-bottom: 8px;
   }
 
@@ -60,25 +60,25 @@
 
   .label {
     font-size: 0.8rem;
-    color: #888;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
   .value {
     font-size: 0.85rem;
-    color: #ccc;
+    color: var(--text);
   }
 
   .value.ip {
     font-size: 0.95rem;
     font-weight: 700;
-    color: #22c55e;
+    color: var(--ok);
     font-family: "SF Mono", "Fira Code", monospace;
   }
 
   .loading {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.9rem;
   }
 </style>

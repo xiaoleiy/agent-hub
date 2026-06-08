@@ -74,7 +74,7 @@
   .system-status h2 {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-strong);
     margin-bottom: 8px;
   }
 
@@ -92,36 +92,36 @@
 
   .label {
     font-size: 0.8rem;
-    color: #888;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
   .bar-container {
     height: 6px;
-    background: #2a2a2a;
+    background: var(--surface-3);
     border-radius: 3px;
     overflow: hidden;
   }
 
   .bar {
     height: 100%;
-    background: #22c55e;
+    background: var(--ok);
     border-radius: 3px;
     transition: width 0.5s ease;
   }
 
   .bar.medium {
-    background: #eab308;
+    background: var(--warn);
   }
 
   .bar.high {
-    background: #ef4444;
+    background: var(--danger);
   }
 
   .value {
     font-size: 0.85rem;
-    color: #ccc;
+    color: var(--text);
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
@@ -132,7 +132,7 @@
   }
 
   .loading {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.9rem;
   }
 </style>

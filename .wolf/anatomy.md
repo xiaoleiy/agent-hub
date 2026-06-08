@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T14:20:38.605Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T15:13:45.084Z
 > Files: 118 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../tmp/
@@ -212,11 +212,11 @@
 ## src-tauri/src/core_modules/agents/
 
 - `claude.rs` — detect, get_sessions, get_usage, get_rich_usage (~6809 tok)
-- `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~6012 tok)
+- `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~6256 tok)
 - `cursor_cookies.rs` — Best-effort extraction of the Cursor session cookie (~2878 tok)
-- `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4642 tok)
+- `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4740 tok)
 - `mod.rs` — Detect all agents and return their info (~404 tok)
-- `opencode.rs` — OpenCode keeps everything in one SQLite DB under the XDG data dir. (~4238 tok)
+- `opencode.rs` — OpenCode keeps everything in one SQLite DB under the XDG data dir. (~4306 tok)
 
 ## src-tauri/src/models/
 
@@ -234,15 +234,15 @@
 ## src/lib/components/
 
 - `AgentCard.svelte` — Svelte: AgentCard, 4 stores (~893 tok)
-- `AgentTab.svelte` — Svelte: AgentTab (~3988 tok)
-- `KeepAlive.svelte` — Svelte: KeepAlive (~977 tok)
-- `NetworkInfo.svelte` — Svelte: NetworkInfo (~443 tok)
-- `ProxyInfo.svelte` — Svelte: ProxyInfo (~3330 tok)
+- `AgentTab.svelte` — Svelte: AgentTab (~4617 tok)
+- `KeepAlive.svelte` — Svelte: KeepAlive (~1046 tok)
+- `NetworkInfo.svelte` — Svelte: NetworkInfo (~455 tok)
+- `ProxyInfo.svelte` — Svelte: ProxyInfo (~3494 tok)
 - `SessionList.svelte` — Svelte: SessionList, 1 stores (~965 tok)
-- `SystemStatus.svelte` — Svelte: SystemStatus (~912 tok)
+- `SystemStatus.svelte` — Svelte: SystemStatus (~930 tok)
 - `UsageChart.svelte` — Svelte: UsageChart, 2 stores (~492 tok)
 
 ## src/routes/
 
 - `+layout.js` — Tauri doesn't have a Node.js server to do proper SSR (~83 tok)
-- `+page.svelte` — Svelte: +page (~1554 tok)
+- `+page.svelte` — Svelte: +page (~2967 tok)

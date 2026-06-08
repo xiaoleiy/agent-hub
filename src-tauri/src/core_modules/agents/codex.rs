@@ -218,7 +218,7 @@ pub fn get_sessions() -> Vec<Session> {
 
     let mut stmt = match conn.prepare(
         "SELECT id, title, source, model_provider, cwd, created_at, updated_at
-         FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT 20",
+         FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT 30",
     ) {
         Ok(s) => s,
         Err(_) => return vec![],

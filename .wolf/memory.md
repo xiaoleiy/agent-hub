@@ -241,3 +241,87 @@
 | 22:20 | Edited src/lib/components/SystemStatus.svelte | modified formatRate() | ~72 |
 | 22:30 | Frontend density pass for 500px popover: root 13px, tight spacing, sessions table→aligned 2-line list, header/token/model fixes; QC via mocked-invoke headless chrome | +page.svelte, AgentTab, SystemStatus, NetworkInfo, KeepAlive, ProxyInfo | page 1731→1068px tall; svelte-check 0 errors; build ok | ~14000 |
 | 22:22 | Session end: 39 writes across 15 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 17 reads | ~33994 tok |
+| 22:40 | Edited src/routes/+page.svelte | modified global() | ~1139 |
+| 22:40 | Edited src/routes/+page.svelte | 6→6 lines | ~29 |
+| 22:40 | Edited src/routes/+page.svelte | 4→4 lines | ~28 |
+| 22:40 | Edited src/routes/+page.svelte | 3→3 lines | ~26 |
+| 22:40 | Edited src/routes/+page.svelte | 3→3 lines | ~26 |
+| 22:40 | Edited src/routes/+page.svelte | 8→8 lines | ~38 |
+| 22:40 | Edited src/routes/+page.svelte | 8→8 lines | ~36 |
+| 22:40 | Edited src/lib/components/SystemStatus.svelte | 6→6 lines | ~34 |
+| 22:40 | Edited src/lib/components/SystemStatus.svelte | 35→35 lines | ~158 |
+| 22:40 | Edited src/lib/components/SystemStatus.svelte | 4→4 lines | ~18 |
+| 22:41 | Edited src/lib/components/NetworkInfo.svelte | 6→6 lines | ~34 |
+| 22:41 | Edited src/lib/components/NetworkInfo.svelte | 23→23 lines | ~107 |
+| 22:41 | Edited src/lib/components/KeepAlive.svelte | 12→12 lines | ~60 |
+| 22:41 | Edited src/lib/components/KeepAlive.svelte | modified not() | ~140 |
+| 22:41 | Edited src/lib/components/KeepAlive.svelte | 20→20 lines | ~99 |
+| 22:41 | Edited src/lib/components/KeepAlive.svelte | 9→9 lines | ~52 |
+| 22:41 | Edited src/lib/components/KeepAlive.svelte | modified not() | ~22 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | modified usageBarColor() | ~51 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 6→6 lines | ~37 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 11→11 lines | ~57 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 2→2 lines | ~39 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 20→20 lines | ~165 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 5→5 lines | ~26 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 4→4 lines | ~20 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 6→6 lines | ~32 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 13→13 lines | ~66 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 15→15 lines | ~82 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 18→18 lines | ~92 |
+| 22:41 | Edited src/lib/components/AgentTab.svelte | 5→5 lines | ~29 |
+| 22:42 | Edited src/lib/components/AgentTab.svelte | 27→27 lines | ~146 |
+| 22:42 | Edited src/lib/components/AgentTab.svelte | 13→13 lines | ~70 |
+| 22:42 | Edited src/lib/components/AgentTab.svelte | 6→6 lines | ~41 |
+| 22:42 | Edited src/lib/components/AgentTab.svelte | 4→4 lines | ~23 |
+| 22:42 | Edited src/lib/components/AgentTab.svelte | 10→10 lines | ~62 |
+| 22:42 | Edited src/lib/components/AgentTab.svelte | 15→15 lines | ~99 |
+| 22:42 | Edited src/lib/components/AgentTab.svelte | 10→10 lines | ~83 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | modified delayColor() | ~58 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 13→13 lines | ~67 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 11→11 lines | ~53 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 16→16 lines | ~92 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 19→19 lines | ~100 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 5→5 lines | ~27 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 45→45 lines | ~216 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 23→23 lines | ~130 |
+| 22:42 | Edited src/lib/components/ProxyInfo.svelte | 14→14 lines | ~68 |
+| 22:43 | Edited src/lib/components/ProxyInfo.svelte | 44→44 lines | ~230 |
+| 22:43 | Edited src/lib/components/ProxyInfo.svelte | 34→34 lines | ~172 |
+| 22:43 | Edited src/lib/components/ProxyInfo.svelte | 13→13 lines | ~59 |
+| 22:43 | dark/light theme framework: semantic CSS vars (--bg/surface/text/accent + tints), dark default + light via prefers-color-scheme + data-theme hook | +page.svelte, SystemStatus/NetworkInfo/AgentTab/ProxyInfo/KeepAlive.svelte | check+build pass | ~13k |
+| 22:45 | Edited src/routes/+page.svelte | 4→7 lines | ~60 |
+| 22:45 | Edited src/routes/+page.svelte | expanded (+16 lines) | ~96 |
+| 22:45 | Add app icon to header (flex row) | src/routes/+page.svelte, static/app-icon.png | done | ~3k |
+| 22:45 | Edited src/lib/components/AgentTab.svelte | 5→5 lines | ~22 |
+| 22:45 | Edited src/lib/components/AgentTab.svelte | removed 9 lines | ~10 |
+| 22:45 | Edited src/lib/components/AgentTab.svelte | removed 9 lines | ~8 |
+| 22:45 | Edited src/lib/components/AgentTab.svelte | removed 9 lines | ~8 |
+| 22:45 | Edited src/lib/components/AgentTab.svelte | removed 9 lines | ~9 |
+| 22:46 | flatten AgentTab content sections (remove card chrome from rate-limits/tokens/models/summary; gap 8->12) | src/lib/components/AgentTab.svelte | done | ~1500 |
+| 22:48 | Edited src/routes/+page.svelte | 3→3 lines | ~27 |
+| 22:48 | Edited src/lib/components/KeepAlive.svelte | modified not() | ~43 |
+| 22:48 | Edited src/lib/components/KeepAlive.svelte | modified not() | ~31 |
+| 22:48 | Edited src/lib/components/AgentTab.svelte | modified fetchData() | ~346 |
+| 22:48 | Edited src/routes/+page.svelte | added 2 condition(s) | ~256 |
+| 22:48 | Edited src/routes/+page.svelte | 7→10 lines | ~86 |
+| 22:48 | Edited src/routes/+page.svelte | 3→4 lines | ~19 |
+| 22:48 | Edited src/lib/components/AgentTab.svelte | 4→5 lines | ~29 |
+| 22:48 | Edited src/lib/components/AgentTab.svelte | 9→10 lines | ~54 |
+| 22:48 | Edited src/lib/components/ProxyInfo.svelte | 5→6 lines | ~34 |
+| 22:48 | Edited src/lib/components/ProxyInfo.svelte | 10→11 lines | ~66 |
+| 22:49 | scroll perf: kill transition:all, dedupe polls, decouple AgentTab refetch from object churn, add CSS containment | +page.svelte, AgentTab.svelte, KeepAlive.svelte, ProxyInfo.svelte | check+build pass | ~9k |
+| 23:05 | 4 subagents (theme→icon→sessions→perf): dark/light theme framework, header app icon, flattened agent-tab sections, scroll perf (poll-churn+transitions+contain) | +page.svelte, AgentTab, SystemStatus, NetworkInfo, KeepAlive, ProxyInfo, static/app-icon.png | check 0 errors; build ok; QC dark+light verified | ~30000 |
+| 22:53 | Session end: 105 writes across 15 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 17 reads | ~41795 tok |
+| 23:03 | Edited src/lib/components/AgentTab.svelte | added 1 condition(s) | ~146 |
+| 23:03 | Edited src/lib/components/AgentTab.svelte | 4→5 lines | ~42 |
+| 23:03 | Edited src/lib/components/AgentTab.svelte | reduced (-6 lines) | ~20 |
+| 23:03 | Edited src/lib/components/AgentTab.svelte | expanded (+17 lines) | ~402 |
+| 23:04 | Edited src/lib/components/AgentTab.svelte | 9→10 lines | ~61 |
+| 23:04 | Edited src/lib/components/AgentTab.svelte | 7→6 lines | ~34 |
+| 23:04 | Edited src/lib/components/AgentTab.svelte | modified not() | ~235 |
+| 23:25 | Active Sessions: id/title now flex-grows to full width (dropped 14-char truncate + auto-margin that starved it); added client pagination 10/page with prev/next | src/lib/components/AgentTab.svelte | check 0 errors; QC: full title 359px, pager 1/2 & 2/2 verified | ~5000 |
+| 23:07 | Session end: 112 writes across 15 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 17 reads | ~42992 tok |
+| 23:13 | Edited src-tauri/src/core_modules/agents/opencode.rs | 20 → 30 | ~13 |
+| 23:13 | Edited src-tauri/src/core_modules/agents/codex.rs | inline fix | ~21 |
+| 23:13 | Edited src-tauri/src/core_modules/agents/cursor.rs | "SELECT conversationId, mo" → "SELECT conversationId, mo" | ~32 |

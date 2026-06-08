@@ -188,7 +188,7 @@ pub fn get_sessions() -> Vec<Session> {
     // There is no `source`/`timestamp` column — the old query errored and the
     // sessions list was always empty.
     let mut stmt = match conn.prepare(
-        "SELECT conversationId, model, mode, updatedAt FROM conversation_summaries ORDER BY updatedAt DESC LIMIT 20",
+        "SELECT conversationId, model, mode, updatedAt FROM conversation_summaries ORDER BY updatedAt DESC LIMIT 30",
     ) {
         Ok(s) => s,
         Err(_) => return vec![],

@@ -737,6 +737,106 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-08T14:20:38.622Z"
+    },
+    {
+      "id": "bug-044",
+      "timestamp": "2026-06-08T14:40:31.299Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/routes/+page.svelte",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 12→129 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T14:40:31.299Z"
+    },
+    {
+      "id": "bug-045",
+      "timestamp": "2026-06-08T14:41:20.599Z",
+      "error_message": "Wrong reference: ef444430 should be var",
+      "file": "src/lib/components/KeepAlive.svelte",
+      "root_cause": "Used \"ef444430\" instead of \"var\"",
+      "fix": "Changed ef444430 → var",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T14:41:20.599Z"
+    },
+    {
+      "id": "bug-046",
+      "timestamp": "2026-06-08T14:48:32.603Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/routes/+page.svelte",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 15→26 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T14:48:32.603Z"
+    },
+    {
+      "id": "bug-047",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "error_message": "Scrolling in the menu-bar popover is not smooth (jank/hitches)",
+      "file": "src/lib/components/AgentTab.svelte",
+      "root_cause": "The 5s poll in +page.svelte reassigns `agents` to brand-new arrays/objects every tick. AgentTab's $effect depended on the whole `agent` object, so the new reference re-ran the effect, re-fetched sessions + rich usage, and re-rendered the whole tab every 5s. A poll firing mid-scroll caused a hitch. Compounded by `transition: all 0.2s` on several elements and lack of CSS containment so subtree updates reflowed the whole scrolling page.",
+      "fix": "AgentTab effect now depends only on `agent.name` (stable identity) so it refetches on tab switch, not on every object reference; added a separate decoupled 5s interval for live refresh. Guarded parent state assignments (agents, keepAliveStatus) with a cheap JSON.stringify compare so unchanged polls don't trigger re-renders. Replaced `transition: all` with specific properties (color/background/border-color). Added `contain: content` / `contain: layout style` to cards, tab content, and repeated rows (session-item, model-row, node-group, vpn-item) to scope reflow.",
+      "tags": [
+        "performance",
+        "scroll",
+        "jank",
+        "svelte",
+        "polling",
+        "css-containment",
+        "transition"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T00:00:00Z"
+    },
+    {
+      "id": "bug-048",
+      "timestamp": "2026-06-08T15:03:59.752Z",
+      "error_message": "Significant refactor of ",
+      "file": "src/lib/components/AgentTab.svelte",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 25→42 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "svelte"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T15:03:59.752Z"
+    },
+    {
+      "id": "bug-049",
+      "timestamp": "2026-06-08T15:13:45.092Z",
+      "error_message": "Incorrect value in code",
+      "file": "src-tauri/src/core_modules/agents/cursor.rs",
+      "root_cause": "Had \"SELECT conversationId, model, mode, updatedAt FRO",
+      "fix": "Changed to \"SELECT conversationId, model, mode, updatedAt FRO",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T15:13:45.092Z"
     }
   ]
 }

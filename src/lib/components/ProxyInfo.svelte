@@ -40,10 +40,10 @@
 
   /** @param {number|undefined} ms */
   function delayColor(ms) {
-    if (!ms) return "#666";
-    if (ms <= 100) return "#22c55e";
-    if (ms <= 300) return "#eab308";
-    return "#ef4444";
+    if (!ms) return "var(--text-dim)";
+    if (ms <= 100) return "var(--ok)";
+    if (ms <= 300) return "var(--warn)";
+    return "var(--danger)";
   }
 </script>
 
@@ -212,8 +212,8 @@
   }
 
   .section {
-    background: #1a1a1a;
-    border: 1px solid #262626;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 12px;
   }
@@ -221,7 +221,7 @@
   .section h3 {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-strong);
     margin-bottom: 8px;
   }
 
@@ -234,14 +234,14 @@
   }
 
   .label {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
   .value {
-    color: #fff;
+    color: var(--text-strong);
     font-weight: 500;
   }
 
@@ -252,21 +252,21 @@
   }
 
   .proxy-card {
-    background: #222;
-    border: 1px solid #333;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
     border-radius: 8px;
     padding: 8px 10px;
     transition: border-color 0.2s;
   }
 
   .proxy-card.enabled {
-    border-color: #2563eb40;
+    border-color: var(--accent-tint-strong);
   }
 
   .proxy-type {
     font-size: 0.7rem;
     font-weight: 600;
-    color: #888;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 4px;
@@ -275,13 +275,13 @@
   .proxy-addr {
     font-family: "SF Mono", "Fira Code", monospace;
     font-size: 0.8rem;
-    color: #0ea5e9;
+    color: var(--info);
     word-break: break-all;
   }
 
   .proxy-addr.pac-url {
     font-size: 0.7rem;
-    color: #888;
+    color: var(--text-muted);
     max-height: 2.4em;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -289,7 +289,7 @@
 
   .proxy-off {
     font-size: 0.8rem;
-    color: #555;
+    color: var(--text-dim);
   }
 
   .bypass {
@@ -301,7 +301,7 @@
   }
 
   .bypass-list {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     word-break: break-all;
   }
@@ -317,47 +317,48 @@
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-    background: #222;
+    background: var(--surface-2);
     border-radius: 8px;
-    border: 1px solid #333;
+    border: 1px solid var(--border-strong);
     font-size: 0.85rem;
+    contain: content;
   }
 
   .vpn-item.connected {
-    border-color: #22c55e40;
+    border-color: var(--ok-tint-strong);
   }
 
   .vpn-status {
     font-size: 0.7rem;
-    color: #555;
+    color: var(--text-dim);
   }
 
   .vpn-status.connected {
-    color: #22c55e;
+    color: var(--ok);
   }
 
   .vpn-name {
     font-weight: 600;
-    color: #fff;
+    color: var(--text-strong);
     flex: 1;
   }
 
   .vpn-type {
     font-size: 0.7rem;
-    background: #333;
-    color: #888;
+    background: var(--border-strong);
+    color: var(--text-muted);
     padding: 2px 6px;
     border-radius: 4px;
   }
 
   .vpn-state {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--text-muted);
   }
 
   .client-card {
-    background: #222;
-    border: 1px solid #2563eb40;
+    background: var(--surface-2);
+    border: 1px solid var(--accent-tint-strong);
     border-radius: 8px;
     padding: 12px;
   }
@@ -372,22 +373,22 @@
   .client-name {
     font-weight: 700;
     font-size: 1rem;
-    color: #fff;
+    color: var(--text-strong);
   }
 
   .client-ver {
     font-family: "SF Mono", "Fira Code", monospace;
     font-size: 0.75rem;
-    color: #0ea5e9;
-    background: #0ea5e920;
+    color: var(--info);
+    background: var(--info-tint);
     padding: 2px 6px;
     border-radius: 4px;
   }
 
   .client-type {
     font-size: 0.7rem;
-    background: #333;
-    color: #888;
+    background: var(--border-strong);
+    color: var(--text-muted);
     padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
@@ -406,17 +407,17 @@
   }
 
   .detail-label {
-    color: #888;
+    color: var(--text-muted);
   }
 
   .detail-value {
-    color: #fff;
+    color: var(--text-strong);
     font-family: "SF Mono", "Fira Code", monospace;
     font-size: 0.8rem;
   }
 
   .no-client {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.85rem;
   }
 
@@ -427,9 +428,10 @@
   }
 
   .node-group {
-    border: 1px solid #2a2a2a;
+    border: 1px solid var(--surface-3);
     border-radius: 8px;
     overflow: hidden;
+    contain: content;
   }
 
   .node-header {
@@ -438,9 +440,9 @@
     gap: 10px;
     width: 100%;
     padding: 10px 12px;
-    background: #222;
+    background: var(--surface-2);
     border: none;
-    color: #ccc;
+    color: var(--text);
     font-size: 0.85rem;
     cursor: pointer;
     text-align: left;
@@ -448,19 +450,19 @@
   }
 
   .node-header:hover {
-    background: #2a2a2a;
+    background: var(--surface-3);
   }
 
   .node-name {
     font-weight: 600;
-    color: #fff;
+    color: var(--text-strong);
     flex: 1;
   }
 
   .node-type {
     font-size: 0.65rem;
-    background: #333;
-    color: #888;
+    background: var(--border-strong);
+    color: var(--text-muted);
     padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
@@ -469,7 +471,7 @@
   .node-selected {
     font-family: "SF Mono", "Fira Code", monospace;
     font-size: 0.8rem;
-    color: #0ea5e9;
+    color: var(--info);
     max-width: 200px;
     white-space: nowrap;
     overflow: hidden;
@@ -486,13 +488,13 @@
 
   .expand-icon {
     font-size: 0.7rem;
-    color: #555;
+    color: var(--text-dim);
     width: 12px;
   }
 
   .node-children {
-    background: #1a1a1a;
-    border-top: 1px solid #2a2a2a;
+    background: var(--surface);
+    border-top: 1px solid var(--surface-3);
     max-height: 200px;
     overflow-y: auto;
   }
@@ -503,18 +505,18 @@
     gap: 8px;
     padding: 6px 12px 6px 24px;
     font-size: 0.8rem;
-    color: #888;
-    border-bottom: 1px solid #1f1f1f;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
   }
 
   .node-child.selected {
-    color: #0ea5e9;
+    color: var(--info);
     font-weight: 500;
-    background: #0ea5e910;
+    background: var(--info-tint-weak);
   }
 
   .child-check {
-    color: #0ea5e9;
+    color: var(--info);
     font-size: 0.75rem;
     width: 14px;
   }
@@ -532,14 +534,14 @@
   }
 
   .error {
-    color: #ef4444;
+    color: var(--danger);
     font-size: 0.85rem;
     text-align: center;
     padding: 20px;
   }
 
   .loading {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.9rem;
     text-align: center;
     padding: 30px;

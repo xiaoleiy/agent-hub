@@ -77,13 +77,13 @@
   .keepalive h2 {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-strong);
     margin-bottom: 3px;
   }
 
   .description {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--text-muted);
     margin-bottom: 10px;
   }
 
@@ -96,25 +96,25 @@
   .controls button {
     flex: 1;
     padding: 7px 10px;
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
     border-radius: 7px;
-    color: #ccc;
+    color: var(--text);
     font-size: 0.82rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
   }
 
   .controls button:hover:not(:disabled) {
-    background: #333;
-    border-color: #444;
-    color: #fff;
+    background: var(--border-strong);
+    border-color: var(--text-dim);
+    color: var(--text-strong);
   }
 
   .controls button.active {
-    background: #22c55e20;
-    border-color: #22c55e;
-    color: #22c55e;
+    background: var(--ok-tint);
+    border-color: var(--ok);
+    color: var(--ok);
   }
 
   .controls button:disabled {
@@ -127,8 +127,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    background: #222;
-    border: 1px solid #2a2a2a;
+    background: var(--surface-2);
+    border: 1px solid var(--surface-3);
     border-radius: 8px;
     font-size: 0.82rem;
   }
@@ -137,14 +137,14 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #22c55e;
+    color: var(--ok);
     font-weight: 500;
   }
 
   .pulse {
     width: 8px;
     height: 8px;
-    background: #22c55e;
+    background: var(--ok);
     border-radius: 50%;
     animation: pulse 2s ease-in-out infinite;
   }
@@ -155,22 +155,22 @@
   }
 
   .status-off {
-    color: #666;
+    color: var(--text-dim);
   }
 
   .off-btn {
-    background: #ef444420;
-    border: 1px solid #ef444440;
-    color: #ef4444;
+    background: var(--danger-tint);
+    border: 1px solid var(--danger-tint-strong);
+    color: var(--danger);
     padding: 4px 12px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.8rem;
-    transition: all 0.2s;
+    transition: background 0.15s, border-color 0.15s;
   }
 
   .off-btn:hover:not(:disabled) {
-    background: #ef444430;
+    background: var(--danger-tint-hover);
   }
 
   .off-btn:disabled {
