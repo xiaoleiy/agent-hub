@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T08:27:13.974Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T08:58:04.023Z
 > Files: 116 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -160,8 +160,8 @@
 
 - `.gitignore` — Git ignore rules (~45 tok)
 - `build.rs` (~12 tok)
-- `Cargo.toml` — Rust package manifest (~284 tok)
-- `tauri.conf.json` (~364 tok)
+- `Cargo.toml` — Rust package manifest (~287 tok)
+- `tauri.conf.json` (~372 tok)
 
 ## src-tauri/capabilities/
 
@@ -180,7 +180,7 @@
 
 ## src-tauri/src/
 
-- `lib.rs` — Entry point: routes to CLI mode or GUI mode based on arguments. (~799 tok)
+- `lib.rs` — Show or hide the main window. (~1503 tok)
 - `main.rs` — Prevents additional console window on Windows in release, DO NOT REMOVE!! (~53 tok)
 
 ## src-tauri/src/cli/

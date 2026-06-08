@@ -174,3 +174,7 @@
 | 16:23 | Created packaging/homebrew/Formula/agent-hub-cli.rb | — | ~363 |
 | 16:27 | Created packaging/homebrew/Formula/agent-hub-cli.rb | — | ~358 |
 | 16:35 | No-admin distribution: tauri ad-hoc signingIdentity fix (no more 'damaged'); CLI-only formula agent-hub-cli (verified installs to /opt/homebrew/bin, no sudo); release auto-updates cask+formula (verified on runner); README install rewritten | tauri.conf.json, packaging/homebrew/Formula, release.yml, README.md, tap | formula install OK; update-tap success bumps both; YAML valid | ~50k |
+| 16:35 | Session end: 41 writes across 11 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 9 reads | ~22252 tok |
+| 16:57 | Edited src-tauri/src/lib.rs | modified toggle_window() | ~1340 |
+| 16:57 | Edited src-tauri/tauri.conf.json | 15→15 lines | ~94 |
+| 16:58 | Edited src-tauri/Cargo.toml | inline fix | ~18 |

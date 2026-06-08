@@ -46,6 +46,11 @@
       "count": 1,
       "tokens": 0,
       "first_read": "2026-06-08T07:11:38.107Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/lib.rs": {
+      "count": 1,
+      "tokens": 799,
+      "first_read": "2026-06-08T08:55:48.109Z"
     }
   },
   "files_written": [
@@ -294,6 +299,24 @@
       "action": "create",
       "tokens": 384,
       "at": "2026-06-08T08:27:13.981Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/lib.rs",
+      "action": "edit",
+      "tokens": 1435,
+      "at": "2026-06-08T08:57:17.714Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/tauri.conf.json",
+      "action": "edit",
+      "tokens": 94,
+      "at": "2026-06-08T08:57:36.020Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/Cargo.toml",
+      "action": "edit",
+      "tokens": 19,
+      "at": "2026-06-08T08:58:04.031Z"
     }
   ],
   "edit_counts": {
@@ -302,17 +325,18 @@
     "src-tauri/src/models/types.rs": 2,
     "src-tauri/src/core_modules/agents/codex.rs": 7,
     "src-tauri/src/tui/mod.rs": 6,
-    "src-tauri/Cargo.toml": 3,
+    "src-tauri/Cargo.toml": 4,
     "src-tauri/src/core_modules/agents/cursor_cookies.rs": 2,
     "src-tauri/src/core_modules/agents/mod.rs": 1,
     "src-tauri/src/core_modules/agents/cursor.rs": 5,
     "LICENSE": 1,
-    "src-tauri/tauri.conf.json": 2,
-    "packaging/homebrew/Formula/agent-hub-cli.rb": 2
+    "src-tauri/tauri.conf.json": 3,
+    "packaging/homebrew/Formula/agent-hub-cli.rb": 2,
+    "src-tauri/src/lib.rs": 1
   },
-  "anatomy_hits": 5,
+  "anatomy_hits": 6,
   "anatomy_misses": 4,
   "repeated_reads_warned": 5,
   "cerebrum_warnings": 0,
-  "stop_count": 10
+  "stop_count": 11
 }

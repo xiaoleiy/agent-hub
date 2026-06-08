@@ -30,6 +30,15 @@ class AgentHubCli < Formula
     bin.install binary => "agent-hub"
   end
 
+  def caveats
+    <<~EOS
+      Installed as the `agent-hub` command (the formula name is agent-hub-cli):
+        agent-hub tui      # interactive dashboard
+        agent-hub status   # system + agent status
+        agent-hub --help   # all commands
+    EOS
+  end
+
   test do
     assert_match version.to_s, shell_output("#{bin}/agent-hub --version")
   end

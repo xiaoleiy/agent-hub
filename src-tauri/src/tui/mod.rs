@@ -1024,6 +1024,11 @@ fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], a
         return;
     }
 
+    // Responsive Session-ID column: grow with the panel, up to a full UUID (36).
+    // 30 ≈ mode(8) + status(10) + time(8) + 4 inter-column gaps.
+    let flexible = inner.width.saturating_sub(30);
+    let id_w = flexible.saturating_sub(16).clamp(14, 38);
+
     let rows: Vec<Row> = sessions
         .iter()
         .map(|s| {
@@ -1048,7 +1053,7 @@ fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], a
             let sid = if s.id.is_empty() {
                 "—".to_string()
             } else {
-                truncate_id(&s.id, 22)
+                truncate_id(&s.id, id_w as usize)
             };
 
             // Working dir: show tail with more space
@@ -1083,11 +1088,11 @@ fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], a
 
     // Responsive widths: session ID fixed, mode+status compact, working dir gets the bulk
     let widths = [
-        Constraint::Length(24), // Session ID
-        Constraint::Length(8),  // Mode
-        Constraint::Length(10), // Status
-        Constraint::Min(16),    // Working Dir (flexible, gets remaining space)
-        Constraint::Length(8),  // Time
+        Constraint::Length(id_w), // Session ID (responsive)
+        Constraint::Length(8),    // Mode
+        Constraint::Length(10),   // Status
+        Constraint::Min(16),      // Working Dir (flexible, gets remaining space)
+        Constraint::Length(8),    // Time
     ];
 
     let table = Table::new(rows, widths).header(

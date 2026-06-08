@@ -14,16 +14,16 @@
       {
         "title": "Agent Hub",
         "label": "main",
-        "width": 900,
-        "height": 700,
-        "resizable": true,
-        "fullscreen": false
+        "width": 480,
+        "height": 640,
+        "resizable": false,
+        "fullscreen": false,
+        "visible": false,
+        "decorations": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/tray.png",
-      "iconAsTemplate": true
-    },
     "security": {
       "csp": null
     }
