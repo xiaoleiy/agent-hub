@@ -185,3 +185,4 @@
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+| 17:29 | Cut v0.2.0: bumped manifests, responsive frontend (auto-fit grids @ 500x680), tagged+built draft release (both arch, valid sig, menu-bar app). update-tap auto-bumps cask+formula on publish (TAP token set) | tauri.conf/package.json/Cargo.toml, +page.svelte, AgentTab.svelte | release CI success; v0.2.0 draft has correct assets | ~12k |
