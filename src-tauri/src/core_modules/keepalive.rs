@@ -127,9 +127,21 @@ fn stop_keepalive_internal() {
     // Also check persisted state for orphaned caffeinate processes
     let state = load_state();
     if let Some(pid) = state.pid {
-        // Try to kill the process by PID (handles case where app restarted)
-        let _ = Command::new("kill").arg(pid.to_string()).output();
+        // Only kill if the PID is still actually caffeinate — PIDs get recycled,
+        // so a stale stored PID could otherwise point at an unrelated process.
+        if is_caffeinate(pid) {
+            let _ = Command::new("kill").arg(pid.to_string()).output();
+        }
     }
+}
+
+/// True if `pid` is alive and its process name is caffeinate.
+fn is_caffeinate(pid: u32) -> bool {
+    Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "comm="])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().ends_with("caffeinate"))
+        .unwrap_or(false)
 }
 
 /// Get current keep-alive status

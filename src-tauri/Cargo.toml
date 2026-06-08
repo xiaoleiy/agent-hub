@@ -29,3 +29,8 @@ anyhow = "1"
 dirs-next = "2"
 ratatui = "0.29"
 crossterm = "0.28"
+# Chrome/Chromium cookie decryption (macOS: AES-128-CBC with a Keychain-derived key)
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+sha1 = "0.10"

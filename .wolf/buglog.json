@@ -125,8 +125,16 @@
       "file": "src-tauri/src/tui/mod.rs",
       "root_cause": "App::tab_count() returned `1 + installed_agents().len() + 1`, omitting the Proxy/VPN tab, while tab_names() built `[Dashboard, ...agents, Proxy/VPN, Keep-Alive]`. next_tab()/prev_tab() cycle modulo tab_count(), so the real last index (Keep-Alive) was unreachable. The draw path used tab_names().len(), so the two counts had drifted out of sync.",
       "fix": "Made tab_count() return self.tab_names().len() — single source of truth, so the navigable tab count always matches the rendered tabs.",
-      "tags": ["tui", "tab", "navigation", "off-by-one", "keep-alive"],
-      "related_bugs": ["bug-003"],
+      "tags": [
+        "tui",
+        "tab",
+        "navigation",
+        "off-by-one",
+        "keep-alive"
+      ],
+      "related_bugs": [
+        "bug-003"
+      ],
       "occurrences": 1,
       "last_seen": "2026-06-08"
     },
@@ -137,10 +145,341 @@
       "file": "src-tauri/src/tui/mod.rs",
       "root_cause": "App::new() ran a full data collection and then app.refresh() ran it AGAIN before the first frame. The full refresh() ran every 3s tick inline (blocking the event loop, so key presses queued during a tick were delayed seconds). It always probed proxy (proxy::get_proxy_info: ~6 networksetup/scutil subprocess spawns + 7 localhost HTTP probes each creating its own tokio runtime + up to 16 pgrep spawns) and loaded every agent's sessions/5h-usage/1w-usage/rich-usage regardless of the active tab. agent_usage_1w was fetched on every tick but never rendered. system::get_system_status() used System::new_all() (enumerates all processes twice) for data that only needs CPU+RAM.",
       "fix": "Lazy-load per tab: Dashboard data at startup; Proxy and per-agent detail loaded only when their tab is first viewed (cached via proxy: Option + agent_detail_loaded flags). Periodic tick_refresh() now refreshes only system stats + the active tab's data. Removed the redundant startup refresh and the never-rendered agent_usage_1w fetch. Slimmed get_system_status() to System::new() + refresh_cpu_usage()/refresh_memory() instead of new_all()+refresh_all() twice.",
-      "tags": ["tui", "performance", "startup", "lazy-loading", "proxy", "event-loop", "sysinfo"],
-      "related_bugs": ["bug-008"],
+      "tags": [
+        "tui",
+        "performance",
+        "startup",
+        "lazy-loading",
+        "proxy",
+        "event-loop",
+        "sysinfo"
+      ],
+      "related_bugs": [
+        "bug-008"
+      ],
       "occurrences": 1,
       "last_seen": "2026-06-08"
+    },
+    {
+      "id": "bug-010",
+      "timestamp": "2026-06-08T03:23:20.733Z",
+      "error_message": "Null/undefined access in ",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:23:20.733Z"
+    },
+    {
+      "id": "bug-011",
+      "timestamp": "2026-06-08T03:23:36.256Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 9→20 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:23:36.256Z"
+    },
+    {
+      "id": "bug-012",
+      "timestamp": "2026-06-08T03:24:24.074Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/core_modules/agents/codex.rs",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 5→20 lines (2 removed) | Also: let updated_at: String = row.get(6).unwrap_or_defa; started_at: Some(updated_at),",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-08T03:25:03.358Z"
+    },
+    {
+      "id": "bug-013",
+      "timestamp": "2026-06-08T03:26:26.419Z",
+      "error_message": "Null/undefined access in ",
+      "file": "src-tauri/src/core_modules/agents/codex.rs",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:26:26.419Z"
+    },
+    {
+      "id": "bug-014",
+      "timestamp": "2026-06-08T03:28:44.857Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/core_modules/agents/cursor.rs",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 28→32 lines (5 removed) | Also: fn test_cursor_agent_binary_exists() {; let candidate = home().join(\".local/bin/cursor-age | Also: fn test_cursor_app_exists() {; let app_path = PathBuf::from(\"/Applications/Cursor",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-06-08T03:29:06.837Z"
+    },
+    {
+      "id": "bug-015",
+      "timestamp": "2026-06-08T03:29:26.503Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/core_modules/network.rs",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 9→14 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:29:26.503Z"
+    },
+    {
+      "id": "bug-016",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "error_message": "Claude session ID and start time always blank; usage total_sessions always 1",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "Structs used snake_case (session_id, started_at) but real ~/.claude files use camelCase (sessionId, startedAt); serde(default) masked it so fields silently defaulted empty.",
+      "fix": "Added serde(rename_all=camelCase) to ClaudeSession+HistoryEntry; tests use real fixtures. Verified sessions show real id+started_at.",
+      "tags": [
+        "claude",
+        "serde",
+        "schema",
+        "camelcase",
+        "incorrect-data"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
+    },
+    {
+      "id": "bug-017",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "error_message": "Codex tokens over-counted 2-3x; window filter ignored; interactions=token sum",
+      "file": "src-tauri/src/core_modules/agents/codex.rs",
+      "root_cause": "total_token_usage is cumulative per session but code summed across all token_count events ([24481,49695,76369,104787]->255332 vs 104787). get_usage compared INTEGER updated_at vs date STRING (SQLite affinity coerced to 2026, filter no-op). total_interactions=SUM(tokens_used). rate limits from last file in dir order. Codex.app hardcoded /Applications but at ~/Apps.",
+      "fix": "Per-file LAST cumulative (mtime-cached); integer epoch window; interactions=thread count; rate limits from newest-mtime file w/ resets_at; codex_app_candidates checks /Applications+~/Applications+~/Apps. Verified 5h=3 vs 1m=46; GUI 26.602.40724.",
+      "tags": [
+        "codex",
+        "tokens",
+        "cumulative",
+        "sqlite",
+        "affinity",
+        "rate-limits",
+        "incorrect-data"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
+    },
+    {
+      "id": "bug-018",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "error_message": "Cursor sessions tab always empty; fabricated '1 active conversation'",
+      "file": "src-tauri/src/core_modules/agents/cursor.rs",
+      "root_cause": "Queried source/timestamp from conversation_summaries, but real cols are conversationId,title,model,mode,updatedAt (no source/timestamp). prepare failed -> empty sessions; count -> unwrap_or(1) -> always 1.",
+      "fix": "Query conversationId,model,mode,updatedAt; window on updatedAt; return 0 on failure.",
+      "tags": [
+        "cursor",
+        "sqlite",
+        "schema",
+        "sessions",
+        "incorrect-data"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
+    },
+    {
+      "id": "bug-019",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "error_message": "codex pgrep false positives; keepalive could kill recycled PID; network no timeout",
+      "file": "src-tauri/src/core_modules/keepalive.rs",
+      "root_cause": "pgrep -f codex matched any process with codex in cmdline/env. keepalive killed stored PID without verifying caffeinate (PID reuse). network had no timeout.",
+      "fix": "pgrep -x codex; is_caffeinate(pid) ps -o comm= guard; reqwest 5s timeout; doc fix ipinfo.io.",
+      "tags": [
+        "codex",
+        "pgrep",
+        "keepalive",
+        "pid-reuse",
+        "network",
+        "timeout",
+        "robustness"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
+    },
+    {
+      "id": "bug-020",
+      "timestamp": "2026-06-08T03:39:39.815Z",
+      "error_message": "Wrong operator: != should be >=",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "Used \"!=\" instead of \">=\"",
+      "fix": "Changed operator != → >=",
+      "tags": [
+        "auto-detected",
+        "operator-fix",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:39:39.815Z"
+    },
+    {
+      "id": "bug-021",
+      "timestamp": "2026-06-08T03:39:51.262Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "9 lines replaced/restructured",
+      "fix": "Rewrote 23→46 lines (9 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:39:51.262Z"
+    },
+    {
+      "error_message": "Claude/Codex CLI versions incorrect in TUI",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "Claude preferred ~/.local/bin/claude (symlink to OLDER 2.1.139) over real claude on PATH+session (2.1.156). Codex read version.json latest_version (update-checker 0.129.0) not installed 0.130.0.",
+      "fix": "Claude: prefer running CLI session version, then PATH claude -v, then ~/.local/bin. Codex: prefer `codex --version`, version.json fallback. Verified 2.1.156 / 0.130.0.",
+      "tags": [
+        "claude",
+        "codex",
+        "version",
+        "cli",
+        "incorrect-data"
+      ],
+      "id": "bug-022",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
+    },
+    {
+      "error_message": "Cursor & Claude GUI versions empty though apps installed/running",
+      "file": "src-tauri/src/core_modules/agents/cursor.rs",
+      "root_cause": "GUI version read hardcoded /Applications, but Cursor.app at ~/Apps (3.7.12). Claude had no desktop detection; /Applications/Claude.app (1.11187.1) never read.",
+      "fix": "cursor_app_candidates/claude_app_candidates check /Applications+~/Applications+~/Apps; get_claude_desktop_version added; Claude gui falls back to desktop app. Verified 3.7.12 / 1.11187.1.",
+      "tags": [
+        "cursor",
+        "claude",
+        "version",
+        "gui",
+        "app-path",
+        "incorrect-data"
+      ],
+      "id": "bug-023",
+      "timestamp": "2026-06-08T00:00:00Z",
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08"
+    },
+    {
+      "id": "bug-024",
+      "timestamp": "2026-06-08T04:30:23.786Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 7→13 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T04:30:23.786Z"
+    },
+    {
+      "id": "bug-025",
+      "timestamp": "2026-06-08T04:30:45.248Z",
+      "error_message": "Function not marked async",
+      "file": "src-tauri/src/core_modules/agents/claude.rs",
+      "root_cause": "Function uses await but wasn't declared async",
+      "fix": "Added async modifier",
+      "tags": [
+        "auto-detected",
+        "async-fix",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T04:30:45.248Z"
+    },
+    {
+      "id": "bug-026",
+      "timestamp": "2026-06-08T04:31:53.902Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/cli/handlers.rs",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 35→68 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T04:31:53.902Z"
+    },
+    {
+      "id": "bug-027",
+      "timestamp": "2026-06-08T05:24:29.526Z",
+      "error_message": "Significant refactor of ",
+      "file": "src-tauri/src/tui/mod.rs",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 9→11 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T05:24:29.526Z"
+    },
+    {
+      "id": "bug-028",
+      "timestamp": "2026-06-08T05:27:08.727Z",
+      "error_message": "Function not marked async",
+      "file": "src-tauri/src/core_modules/agents/cursor.rs",
+      "root_cause": "Function uses await but wasn't declared async",
+      "fix": "Added async modifier",
+      "tags": [
+        "auto-detected",
+        "async-fix",
+        "rs"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T05:27:08.727Z"
     }
   ]
 }

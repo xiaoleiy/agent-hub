@@ -66,7 +66,7 @@ Keybindings:
 agent-hub status
 agent-hub status --json
 
-# Network info (public IP from ip.net.coffee)
+# Network info (public IP from ipinfo.io)
 agent-hub network
 
 # List detected agents

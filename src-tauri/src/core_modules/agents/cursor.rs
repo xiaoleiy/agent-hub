@@ -1,7 +1,10 @@
-use crate::models::types::{AgentInfo, AgentType, AgentUsage, Session, UsageStats};
+use crate::models::types::{AgentInfo, AgentType, AgentUsage, RateWindow, Session, UsageStats};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
+use serde::Deserialize;
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 fn home() -> PathBuf {
     dirs_next::home_dir().unwrap_or_else(|| PathBuf::from("."))
@@ -15,10 +18,23 @@ fn tracking_db_path() -> PathBuf {
     cursor_dir().join("ai-tracking/ai-code-tracking.db")
 }
 
+/// Candidate locations for the Cursor app (varies by install method).
+fn cursor_app_candidates() -> Vec<PathBuf> {
+    vec![
+        PathBuf::from("/Applications/Cursor.app"),
+        home().join("Applications/Cursor.app"),
+        home().join("Apps/Cursor.app"),
+    ]
+}
+
+fn cursor_app_path() -> Option<PathBuf> {
+    cursor_app_candidates().into_iter().find(|p| p.exists())
+}
+
 /// Detect Cursor installation and running state
 pub fn detect() -> AgentInfo {
-    let app_path = PathBuf::from("/Applications/Cursor.app");
-    let installed = app_path.exists() || cursor_dir().exists();
+    let app_path = cursor_app_path();
+    let installed = app_path.is_some() || cursor_dir().exists();
     let running = is_cursor_running();
 
     // Count recent sessions from DB as GUI sessions
@@ -44,11 +60,7 @@ pub fn detect() -> AgentInfo {
         version,
         cli_version,
         gui_version,
-        install_path: if app_path.exists() {
-            Some(app_path.to_string_lossy().to_string())
-        } else {
-            None
-        },
+        install_path: app_path.as_ref().map(|p| p.to_string_lossy().to_string()),
     }
 }
 
@@ -64,24 +76,27 @@ fn is_cursor_running() -> bool {
 fn count_active_conversations() -> usize {
     let db_path = tracking_db_path();
     if !db_path.exists() {
-        return 1; // running but no DB access = at least 1
+        return 0;
     }
     let conn = match Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
         Ok(c) => c,
-        Err(_) => return 1,
+        Err(_) => return 0,
     };
-    // Count conversations active in the last hour
+    // conversation_summaries has `updatedAt` (epoch millis), not `timestamp`.
+    // Count conversations active in the last hour. Don't fabricate a count on
+    // failure — return 0 rather than a fake "1".
     let cutoff = (Utc::now() - chrono::Duration::hours(1)).timestamp_millis();
     conn.query_row(
-        "SELECT COUNT(*) FROM conversation_summaries WHERE timestamp >= ?1",
+        "SELECT COUNT(*) FROM conversation_summaries WHERE updatedAt >= ?1",
         [cutoff],
         |row| row.get(0),
     )
-    .unwrap_or(1)
+    .unwrap_or(0)
 }
 
 fn get_cursor_gui_version() -> Option<String> {
-    let plist = PathBuf::from("/Applications/Cursor.app/Contents/Info.plist");
+    let app = cursor_app_path()?;
+    let plist = app.join("Contents/Info.plist");
     if plist.exists() {
         if let Ok(output) = std::process::Command::new("defaults")
             .arg("read")
@@ -147,8 +162,11 @@ pub fn get_sessions() -> Vec<Session> {
         Err(_) => return vec![],
     };
 
+    // Real columns are conversationId, model, mode, updatedAt (epoch millis).
+    // There is no `source`/`timestamp` column — the old query errored and the
+    // sessions list was always empty.
     let mut stmt = match conn.prepare(
-        "SELECT conversationId, source, timestamp FROM conversation_summaries ORDER BY timestamp DESC LIMIT 20",
+        "SELECT conversationId, model, mode, updatedAt FROM conversation_summaries ORDER BY updatedAt DESC LIMIT 20",
     ) {
         Ok(s) => s,
         Err(_) => return vec![],
@@ -157,8 +175,9 @@ pub fn get_sessions() -> Vec<Session> {
     let sessions: Vec<Session> = stmt
         .query_map([], |row| {
             let id: String = row.get(0).unwrap_or_default();
-            let source: String = row.get(1).unwrap_or_default();
-            let ts: i64 = row.get(2).unwrap_or(0);
+            let model: String = row.get(1).unwrap_or_default();
+            let mode: String = row.get(2).unwrap_or_default();
+            let ts: i64 = row.get(3).unwrap_or(0);
 
             let started = DateTime::from_timestamp_millis(ts)
                 .map(|d| d.to_rfc3339())
@@ -170,9 +189,9 @@ pub fn get_sessions() -> Vec<Session> {
                 status: "completed".to_string(),
                 started_at: Some(started),
                 working_dir: None,
-                model: Some(source.clone()),
+                model: if model.is_empty() { None } else { Some(model) },
                 pid: None,
-                entrypoint: source,
+                entrypoint: mode,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -260,10 +279,14 @@ pub fn get_rich_usage() -> AgentUsage {
         }
     }
 
+    // Cursor's limits are server-side; fetch them with the browser session
+    // cookie (best-effort, cached). plan -> "Plan" window, on-demand -> "On-Demand".
+    let (session_window, weekly_window) = fetch_cursor_rate_limits();
+
     AgentUsage {
         agent: "Cursor".to_string(),
-        session_window: None,
-        weekly_window: None,
+        session_window,
+        weekly_window,
         tokens: None,
         model_breakdowns: vec![],
         total_interactions,
@@ -271,14 +294,133 @@ pub fn get_rich_usage() -> AgentUsage {
     }
 }
 
+// ─── Rate limits (cursor.com usage API via browser session cookie) ───────────
+
+#[derive(Deserialize)]
+struct UsageSummary {
+    #[serde(rename = "billingCycleEnd")]
+    billing_cycle_end: Option<serde_json::Value>,
+    #[serde(rename = "individualUsage")]
+    individual_usage: Option<IndividualUsage>,
+}
+
+#[derive(Deserialize)]
+struct IndividualUsage {
+    plan: Option<UsageBlock>,
+    #[serde(rename = "onDemand")]
+    on_demand: Option<UsageBlock>,
+}
+
+#[derive(Deserialize)]
+struct UsageBlock {
+    used: Option<i64>,
+    limit: Option<i64>,
+    #[serde(rename = "totalPercentUsed")]
+    total_percent_used: Option<f64>,
+}
+
+// Network call — cache 60s (get_rich_usage runs every few seconds on the tab).
+static CURSOR_RL_CACHE: Mutex<Option<(Instant, Option<RateWindow>, Option<RateWindow>)>> =
+    Mutex::new(None);
+
+fn fetch_cursor_rate_limits() -> (Option<RateWindow>, Option<RateWindow>) {
+    if let Ok(guard) = CURSOR_RL_CACHE.lock() {
+        if let Some((t, s, w)) = guard.as_ref() {
+            if t.elapsed() < Duration::from_secs(60) {
+                return (s.clone(), w.clone());
+            }
+        }
+    }
+    let result = fetch_cursor_rate_limits_uncached();
+    if let Ok(mut guard) = CURSOR_RL_CACHE.lock() {
+        *guard = Some((Instant::now(), result.0.clone(), result.1.clone()));
+    }
+    result
+}
+
+fn fetch_cursor_rate_limits_uncached() -> (Option<RateWindow>, Option<RateWindow>) {
+    let cookie = match super::cursor_cookies::find_cursor_session_cookie() {
+        Some(c) => c,
+        None => return (None, None),
+    };
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(_) => return (None, None),
+    };
+    let summary: Option<UsageSummary> = rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .ok()?;
+        let r = client
+            .get("https://cursor.com/api/usage-summary")
+            .header("Cookie", format!("WorkosCursorSessionToken={}", cookie))
+            .header("User-Agent", "agent-hub")
+            .send()
+            .await
+            .ok()?;
+        if !r.status().is_success() {
+            return None;
+        }
+        r.json::<UsageSummary>().await.ok()
+    });
+
+    let summary = match summary {
+        Some(s) => s,
+        None => return (None, None),
+    };
+    let resets = summary.billing_cycle_end.as_ref().and_then(parse_cursor_reset);
+    let individual = match summary.individual_usage {
+        Some(i) => i,
+        None => return (None, None),
+    };
+
+    // Cursor bills monthly; approximate the window as 30 days.
+    const MONTH_MINUTES: u64 = 30 * 24 * 60;
+    let mk = |block: Option<UsageBlock>, label: &str| -> Option<RateWindow> {
+        let b = block?;
+        let pct = b.total_percent_used.or_else(|| match (b.used, b.limit) {
+            (Some(u), Some(l)) if l > 0 => Some(u as f64 / l as f64 * 100.0),
+            _ => None,
+        })?;
+        Some(RateWindow {
+            used_percent: pct,
+            window_minutes: MONTH_MINUTES,
+            resets_at: resets.clone(),
+            label: Some(label.to_string()),
+        })
+    };
+
+    let plan = mk(individual.plan, "Plan");
+    let on_demand = mk(individual.on_demand, "On-Demand");
+    (plan, on_demand)
+}
+
+/// billingCycleEnd may be an ISO string or epoch millis (number or string).
+fn parse_cursor_reset(v: &serde_json::Value) -> Option<String> {
+    if let Some(s) = v.as_str() {
+        // epoch-millis-as-string?
+        if let Ok(ms) = s.parse::<i64>() {
+            return DateTime::from_timestamp_millis(ms).map(|d| d.to_rfc3339());
+        }
+        return Some(s.to_string());
+    }
+    if let Some(ms) = v.as_i64() {
+        return DateTime::from_timestamp_millis(ms).map(|d| d.to_rfc3339());
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_cursor_agent_binary_exists() {
-        let candidate = home().join(".local/bin/cursor-agent");
-        assert!(candidate.exists(), "cursor-agent binary should exist at {:?}", candidate);
+    fn test_cursor_agent_version_is_not_gui_version() {
+        // Whatever the CLI reports, it must never be the GUI semver (the bug we fixed).
+        if let Some(v) = get_cursor_cli_version() {
+            assert_ne!(v, "3.7.12", "CLI version must not be the GUI version");
+        }
     }
 
     #[test]
@@ -326,15 +468,18 @@ mod tests {
         if let Some(cv) = &info.cli_version {
             assert_ne!(cv, "3.7.12", "cli_version should not be GUI version 3.7.12");
         }
-        // GUI version should be available if Cursor.app exists
-        if PathBuf::from("/Applications/Cursor.app").exists() {
+        // GUI version should be available wherever Cursor.app is installed
+        if cursor_app_path().is_some() {
             assert!(info.gui_version.is_some(), "GUI version should be set when Cursor.app exists");
         }
     }
 
     #[test]
-    fn test_cursor_app_exists() {
-        let app_path = PathBuf::from("/Applications/Cursor.app");
-        assert!(app_path.exists(), "Cursor.app should be installed");
+    fn test_detect_installed_consistent_with_paths() {
+        // detect() should report installed iff Cursor.app OR ~/.cursor exists —
+        // not assert a specific machine has Cursor at a hardcoded path.
+        let app = PathBuf::from("/Applications/Cursor.app");
+        let expected = app.exists() || cursor_dir().exists();
+        assert_eq!(detect().installed, expected);
     }
 }

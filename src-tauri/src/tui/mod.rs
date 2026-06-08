@@ -825,14 +825,16 @@ fn draw_rate_limits(f: &mut Frame, usage: &AgentUsage, area: Rect) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(inner);
 
-    // Session window
+    // Session window (or provider-specific primary, e.g. Cursor "Plan")
     if let Some(ref w) = usage.session_window {
-        draw_rate_bar(f, "Session", w.used_percent, w.window_minutes, columns[0]);
+        let label = w.label.as_deref().unwrap_or("Session");
+        draw_rate_bar(f, label, w.used_percent, w.window_minutes, columns[0]);
     }
 
-    // Weekly window
+    // Weekly window (or provider-specific secondary, e.g. Cursor "On-Demand")
     if let Some(ref w) = usage.weekly_window {
-        draw_rate_bar(f, "Weekly", w.used_percent, w.window_minutes, columns[1]);
+        let label = w.label.as_deref().unwrap_or("Weekly");
+        draw_rate_bar(f, label, w.used_percent, w.window_minutes, columns[1]);
     }
 }
 
@@ -845,7 +847,9 @@ fn draw_rate_bar(f: &mut Frame, label: &str, used_pct: f64, window_mins: u64, ar
         Color::Green
     };
 
-    let window_str = if window_mins >= 10080 {
+    let window_str = if window_mins >= 43200 {
+        format!("{}mo", window_mins / 43200)
+    } else if window_mins >= 10080 {
         format!("{}w", window_mins / 10080)
     } else if window_mins >= 1440 {
         format!("{}d", window_mins / 1440)

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T02:29:26.050Z
-> Files: 113 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T05:32:59.531Z
+> Files: 114 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -11,7 +11,7 @@
 - `jsconfig.json` (~193 tok)
 - `package-lock.json` — npm lock file (~17995 tok)
 - `package.json` — Node.js package manifest (~219 tok)
-- `README.md` — Project documentation (~795 tok)
+- `README.md` — Project documentation (~794 tok)
 - `svelte.config.js` — SvelteKit configuration (~137 tok)
 - `vite.config.js` — Vite build configuration (~237 tok)
 
@@ -155,7 +155,7 @@
 
 - `.gitignore` — Git ignore rules (~45 tok)
 - `build.rs` (~12 tok)
-- `Cargo.toml` — Rust package manifest (~232 tok)
+- `Cargo.toml` — Rust package manifest (~279 tok)
 - `tauri.conf.json` (~356 tok)
 
 ## src-tauri/capabilities/
@@ -180,8 +180,8 @@
 
 ## src-tauri/src/cli/
 
-- `handlers.rs` — status, network, agents, sessions + 2 more (~2736 tok)
-- `mod.rs` — Show system status (CPU, RAM, uptime, network) (~782 tok)
+- `handlers.rs` — status, network, agents, sessions, usage (~2915 tok)
+- `mod.rs` — Show system status (CPU, RAM, uptime, network) (~729 tok)
 
 ## src-tauri/src/commands/
 
@@ -194,27 +194,28 @@
 
 ## src-tauri/src/core_modules/
 
-- `keepalive.rs` — State persisted to disk for keep-alive (~1402 tok)
+- `keepalive.rs` — State persisted to disk for keep-alive (~1426 tok)
 - `mod.rs` (~24 tok)
-- `network.rs` — Fetch public network information from ipinfo.io (~84 tok)
+- `network.rs` — Fetch public network information from ipinfo.io. (~136 tok)
 - `proxy.rs` — Gather all proxy/VPN information for the system (~5588 tok)
 - `system.rs` — Gather current system status: CPU, RAM, uptime, network I/O, username. (~1494 tok)
 
 ## src-tauri/src/core_modules/agents/
 
-- `claude.rs` — Detect Claude Code installation and running state (~3870 tok)
-- `codex.rs` — detect, get_sessions, get_usage, get_rich_usage (~4541 tok)
-- `cursor.rs` — Detect Cursor installation and running state (~2978 tok)
-- `mod.rs` — Detect all agents and return their info (~339 tok)
+- `claude.rs` — detect, get_sessions, get_usage, get_rich_usage (~6451 tok)
+- `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~5691 tok)
+- `cursor_cookies.rs` — Best-effort extraction of the Cursor session cookie (~2878 tok)
+- `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4344 tok)
+- `mod.rs` — Detect all agents and return their info (~345 tok)
 
 ## src-tauri/src/models/
 
 - `mod.rs` (~5 tok)
-- `types.rs` — System status information (~1439 tok)
+- `types.rs` — System status information (~1491 tok)
 
 ## src-tauri/src/tui/
 
-- `mod.rs` — run_tui (~13814 tok)
+- `mod.rs` — run_tui (~13896 tok)
 
 ## src/
 

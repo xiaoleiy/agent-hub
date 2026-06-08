@@ -1,9 +1,13 @@
-use crate::models::types::{AgentInfo, AgentType, AgentUsage, ModelUsage, Session, TokenUsage, UsageStats};
+use crate::models::types::{
+    AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage, UsageStats,
+};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::{Duration, Instant, SystemTime};
 
 fn home() -> PathBuf {
     dirs_next::home_dir().unwrap_or_else(|| PathBuf::from("."))
@@ -27,22 +31,38 @@ pub fn detect() -> AgentInfo {
     let mut gui_sessions = 0usize;
     let mut running = false;
     let mut gui_version: Option<String> = None;
+    let mut cli_session_version: Option<(u64, String)> = None;
 
     if sessions.exists() {
         if let Ok(entries) = fs::read_dir(&sessions) {
             for entry in entries.filter_map(|e| e.ok()) {
                 if let Ok(data) = fs::read_to_string(entry.path()) {
                     if let Ok(sess) = serde_json::from_str::<ClaudeSession>(&data) {
+                        let is_cli = matches!(sess.entrypoint.as_str(), "cli" | "sdk-cli");
                         if is_pid_alive(sess.pid) {
                             running = true;
-                            match sess.entrypoint.as_str() {
-                                "cli" | "sdk-cli" => cli_sessions += 1,
-                                _ => gui_sessions += 1,
+                            if is_cli {
+                                cli_sessions += 1;
+                            } else {
+                                gui_sessions += 1;
                             }
                         }
-                        // Track GUI version from session files
-                        if !sess.version.is_empty() && sess.entrypoint != "cli" && sess.entrypoint != "sdk-cli" {
-                            gui_version = Some(sess.version.clone());
+                        if !sess.version.is_empty() {
+                            if is_cli {
+                                // Track the most-recently-started CLI session's version —
+                                // this is the actually-running CLI version, independent of
+                                // PATH / symlink quirks in the installed binary.
+                                let ts = sess.started_at.unwrap_or(0);
+                                if cli_session_version
+                                    .as_ref()
+                                    .map(|(t, _)| ts >= *t)
+                                    .unwrap_or(true)
+                                {
+                                    cli_session_version = Some((ts, sess.version.clone()));
+                                }
+                            } else {
+                                gui_version = Some(sess.version.clone());
+                            }
                         }
                     }
                 }
@@ -50,8 +70,13 @@ pub fn detect() -> AgentInfo {
         }
     }
 
-    // Get CLI version from the binary itself (more accurate than session files)
-    let cli_version = get_claude_cli_version();
+    // CLI version: prefer the running CLI session's version, else the binary.
+    let cli_version = cli_session_version
+        .map(|(_, v)| v)
+        .or_else(get_claude_cli_version);
+
+    // GUI version: a running GUI session's version, else the Claude desktop app.
+    let gui_version = gui_version.or_else(get_claude_desktop_version);
 
     let version = match (&cli_version, &gui_version) {
         (Some(cv), Some(gv)) if cv != gv => Some(format!("CLI {} / GUI {}", cv, gv)),
@@ -89,27 +114,50 @@ fn which_claude() -> bool {
 }
 
 fn get_claude_cli_version() -> Option<String> {
-    let claude_bin = home().join(".local/bin/claude");
-    let cmd = if claude_bin.exists() {
-        claude_bin.to_string_lossy().to_string()
-    } else {
-        "claude".to_string()
-    };
-    if let Ok(output) = std::process::Command::new(&cmd)
-        .arg("-v")
-        .output()
-    {
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            // Output is like "2.1.168 (Claude Code)" — take just the version part
-            let raw = stdout.lines().next().unwrap_or("").trim();
-            let version = raw.split_whitespace().next().unwrap_or(raw);
-            if !version.is_empty() {
-                return Some(version.to_string());
+    // Prefer `claude` on PATH (what the user actually runs). The ~/.local/bin
+    // symlink can point at an older installed version, so it's only a fallback.
+    let local_bin = home().join(".local/bin/claude").to_string_lossy().to_string();
+    for cmd in ["claude".to_string(), local_bin] {
+        if let Ok(output) = std::process::Command::new(&cmd).arg("-v").output() {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // Output is like "2.1.156 (Claude Code)" — take just the version part
+                let raw = stdout.lines().next().unwrap_or("").trim();
+                let version = raw.split_whitespace().next().unwrap_or(raw);
+                if !version.is_empty() {
+                    return Some(version.to_string());
+                }
             }
         }
     }
     None
+}
+
+/// Candidate locations for the Claude desktop app (varies by install method).
+fn claude_app_candidates() -> Vec<PathBuf> {
+    vec![
+        PathBuf::from("/Applications/Claude.app"),
+        home().join("Applications/Claude.app"),
+        home().join("Apps/Claude.app"),
+    ]
+}
+
+/// Read the Claude desktop app's version from its bundle, if installed.
+fn get_claude_desktop_version() -> Option<String> {
+    let app = claude_app_candidates().into_iter().find(|p| p.exists())?;
+    let plist = app.join("Contents/Info.plist");
+    let output = std::process::Command::new("defaults")
+        .arg("read")
+        .arg(&plist)
+        .arg("CFBundleShortVersionString")
+        .output()
+        .ok()?;
+    let v = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
 }
 
 fn is_pid_alive(pid: u32) -> bool {
@@ -121,7 +169,11 @@ fn is_pid_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
+// Claude writes these files with camelCase keys (sessionId, startedAt, ...).
+// rename_all maps our snake_case fields onto them — without it, serde(default)
+// silently leaves session_id/started_at empty and the data never shows up.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ClaudeSession {
     pid: u32,
     #[serde(default)]
@@ -216,7 +268,9 @@ pub fn get_usage(window: &str) -> UsageStats {
     }
 }
 
+// history.jsonl also uses camelCase (sessionId). timestamp is epoch millis.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct HistoryEntry {
     timestamp: i64,
     #[serde(default)]
@@ -276,16 +330,39 @@ pub fn get_rich_usage() -> AgentUsage {
 
     let has_tokens = tokens.total_tokens > 0;
 
+    // Rate limits: Claude Code doesn't persist them locally, but subscriber
+    // accounts expose them via the OAuth usage endpoint (same as the CodexBar
+    // approach). Best-effort + cached; returns (None, None) for API-key users
+    // or if the call fails.
+    let (session_window, weekly_window) = fetch_claude_rate_limits();
+
     AgentUsage {
         agent: "Claude Code".to_string(),
-        session_window: None, // Would need OAuth API call
-        weekly_window: None,
+        session_window,
+        weekly_window,
         tokens: if has_tokens { Some(tokens) } else { None },
         model_breakdowns,
         total_interactions,
         total_sessions: sessions_set.len(),
     }
 }
+
+/// Per-file token aggregate, cached so unchanged transcripts aren't re-parsed.
+#[derive(Clone, Default)]
+struct FileTokenAgg {
+    input: u64,
+    cache_read: u64,
+    cache_create: u64,
+    output: u64,
+    /// (model, input+cache, output, count)
+    models: Vec<(String, u64, u64, usize)>,
+}
+
+// Claude's projects/ dir holds every transcript ever; re-reading and re-parsing
+// all of them on each refresh is the dominant cost. Cache each file's aggregate
+// keyed by mtime — only changed (active) files are re-parsed.
+static CLAUDE_TOKEN_CACHE: Mutex<Option<HashMap<PathBuf, (SystemTime, FileTokenAgg)>>> =
+    Mutex::new(None);
 
 /// Recursively scan JSONL files under a directory for token usage data
 fn collect_jsonl_tokens(
@@ -303,20 +380,55 @@ fn collect_jsonl_tokens(
         if path.is_dir() {
             collect_jsonl_tokens(&path, tokens, model_map);
         } else if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
-            parse_claude_jsonl(&path, tokens, model_map);
+            if let Some(agg) = file_token_agg(&path) {
+                tokens.input_tokens += agg.input;
+                tokens.cache_read_tokens += agg.cache_read;
+                tokens.cache_create_tokens += agg.cache_create;
+                tokens.output_tokens += agg.output;
+                tokens.total_tokens +=
+                    agg.input + agg.cache_read + agg.cache_create + agg.output;
+                for (model, inp, out, count) in agg.models {
+                    let e = model_map.entry(model).or_insert((0, 0, 0));
+                    e.0 += inp;
+                    e.1 += out;
+                    e.2 += count;
+                }
+            }
         }
     }
 }
 
-/// Parse a single Claude JSONL file for token usage from assistant messages
-fn parse_claude_jsonl(
-    path: &PathBuf,
-    tokens: &mut TokenUsage,
-    model_map: &mut HashMap<String, (u64, u64, usize)>,
-) {
+/// Return a file's token aggregate, using the mtime cache when possible.
+fn file_token_agg(path: &Path) -> Option<FileTokenAgg> {
+    let mtime = fs::metadata(path).ok()?.modified().ok()?;
+    if let Ok(guard) = CLAUDE_TOKEN_CACHE.lock() {
+        if let Some(map) = guard.as_ref() {
+            if let Some((cached_mtime, agg)) = map.get(path) {
+                if *cached_mtime == mtime {
+                    return Some(agg.clone());
+                }
+            }
+        }
+    }
+    let agg = parse_claude_jsonl(path);
+    if let Ok(mut guard) = CLAUDE_TOKEN_CACHE.lock() {
+        guard
+            .get_or_insert_with(HashMap::new)
+            .insert(path.to_path_buf(), (mtime, agg.clone()));
+    }
+    Some(agg)
+}
+
+/// Parse a single Claude JSONL file for token usage from assistant messages.
+/// Claude's per-message `usage` is per-call (not cumulative), so summing across
+/// messages is correct.
+fn parse_claude_jsonl(path: &Path) -> FileTokenAgg {
+    let mut agg = FileTokenAgg::default();
+    let mut models: HashMap<String, (u64, u64, usize)> = HashMap::new();
+
     let content = match fs::read_to_string(path) {
         Ok(c) => c,
-        Err(_) => return,
+        Err(_) => return agg,
     };
 
     for line in content.lines() {
@@ -364,17 +476,154 @@ fn parse_claude_jsonl(
             continue;
         }
 
-        tokens.input_tokens += inp;
-        tokens.cache_read_tokens += cache_read;
-        tokens.cache_create_tokens += cache_create;
-        tokens.output_tokens += out;
-        tokens.total_tokens += inp + cache_read + cache_create + out;
+        agg.input += inp;
+        agg.cache_read += cache_read;
+        agg.cache_create += cache_create;
+        agg.output += out;
 
-        let entry = model_map.entry(model).or_insert((0, 0, 0));
+        let entry = models.entry(model).or_insert((0, 0, 0));
         entry.0 += inp + cache_read + cache_create;
         entry.1 += out;
         entry.2 += 1;
     }
+
+    agg.models = models
+        .into_iter()
+        .map(|(m, (i, o, c))| (m, i, o, c))
+        .collect();
+    agg
+}
+
+// ─── Rate limits (OAuth usage endpoint, subscriber accounts) ─────────────────
+
+#[derive(Deserialize)]
+struct ClaudeCreds {
+    #[serde(rename = "claudeAiOauth")]
+    claude_ai_oauth: Option<ClaudeOauth>,
+}
+
+#[derive(Deserialize)]
+struct ClaudeOauth {
+    #[serde(rename = "accessToken")]
+    access_token: Option<String>,
+}
+
+/// Read the Claude OAuth access token from ~/.claude/.credentials.json, falling
+/// back to the macOS Keychain (service "Claude Code-credentials"). Same sources
+/// the Claude CLI itself uses.
+fn claude_oauth_token() -> Option<String> {
+    let parse = |raw: &str| -> Option<String> {
+        serde_json::from_str::<ClaudeCreds>(raw)
+            .ok()?
+            .claude_ai_oauth?
+            .access_token
+            .filter(|t| !t.is_empty())
+    };
+
+    if let Ok(data) = fs::read_to_string(claude_dir().join(".credentials.json")) {
+        if let Some(t) = parse(&data) {
+            return Some(t);
+        }
+    }
+
+    // Keychain fallback (best-effort; may be unavailable without prompt approval).
+    if let Ok(out) = std::process::Command::new("security")
+        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
+        .output()
+    {
+        if out.status.success() {
+            if let Some(t) = parse(String::from_utf8_lossy(&out.stdout).trim()) {
+                return Some(t);
+            }
+        }
+    }
+    None
+}
+
+#[derive(Deserialize)]
+struct OAuthUsageResp {
+    five_hour: Option<OAuthWindow>,
+    seven_day: Option<OAuthWindow>,
+}
+
+#[derive(Deserialize)]
+struct OAuthWindow {
+    utilization: Option<f64>,
+    resets_at: Option<String>,
+}
+
+// The OAuth usage endpoint is rate-limited by Anthropic, and get_rich_usage is
+// called every few seconds while the Claude tab is open — cache for 60s.
+static CLAUDE_RL_CACHE: Mutex<Option<(Instant, Option<RateWindow>, Option<RateWindow>)>> =
+    Mutex::new(None);
+
+/// (session_window, weekly_window) from the OAuth usage endpoint. Cached 60s.
+fn fetch_claude_rate_limits() -> (Option<RateWindow>, Option<RateWindow>) {
+    if let Ok(guard) = CLAUDE_RL_CACHE.lock() {
+        if let Some((t, s, w)) = guard.as_ref() {
+            if t.elapsed() < Duration::from_secs(60) {
+                return (s.clone(), w.clone());
+            }
+        }
+    }
+    let result = fetch_claude_rate_limits_uncached();
+    if let Ok(mut guard) = CLAUDE_RL_CACHE.lock() {
+        *guard = Some((Instant::now(), result.0.clone(), result.1.clone()));
+    }
+    result
+}
+
+fn fetch_claude_rate_limits_uncached() -> (Option<RateWindow>, Option<RateWindow>) {
+    let token = match claude_oauth_token() {
+        Some(t) => t,
+        None => return (None, None),
+    };
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(_) => return (None, None),
+    };
+    let resp: Option<OAuthUsageResp> = rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .ok()?;
+        let r = client
+            .get("https://api.anthropic.com/api/oauth/usage")
+            .header("Authorization", format!("Bearer {}", token))
+            .header("anthropic-beta", "oauth-2025-04-20")
+            .send()
+            .await
+            .ok()?;
+        if !r.status().is_success() {
+            return None;
+        }
+        r.json::<OAuthUsageResp>().await.ok()
+    });
+
+    let resp = match resp {
+        Some(r) => r,
+        None => return (None, None),
+    };
+
+    // `utilization` is already a 0-100 percent. five_hour → session (fallback to
+    // seven_day), seven_day → weekly.
+    let mk = |w: &OAuthWindow, mins: u64| -> Option<RateWindow> {
+        Some(RateWindow {
+            used_percent: w.utilization?,
+            window_minutes: mins,
+            resets_at: w.resets_at.clone(),
+            label: None,
+        })
+    };
+
+    let session = resp
+        .five_hour
+        .as_ref()
+        .and_then(|w| mk(w, 300))
+        .or_else(|| resp.seven_day.as_ref().and_then(|w| mk(w, 10080)));
+    let weekly = resp.seven_day.as_ref().and_then(|w| mk(w, 10080));
+
+    (session, weekly)
 }
 
 #[cfg(test)]
@@ -426,12 +675,23 @@ mod tests {
 
     #[test]
     fn test_claude_session_json_parsing() {
-        let json = r#"{"pid":12345,"session_id":"abc","cwd":"/tmp","started_at":1000,"version":"2.1.168","status":"busy","entrypoint":"cli"}"#;
+        // Real Claude session files use camelCase keys (sessionId, startedAt).
+        let json = r#"{"pid":12345,"sessionId":"abc","cwd":"/tmp","startedAt":1000,"version":"2.1.168","status":"busy","entrypoint":"cli"}"#;
         let sess: ClaudeSession = serde_json::from_str(json).unwrap();
         assert_eq!(sess.pid, 12345);
-        assert_eq!(sess.session_id, "abc");
+        assert_eq!(sess.session_id, "abc", "sessionId must map to session_id");
+        assert_eq!(sess.started_at, Some(1000), "startedAt must map to started_at");
         assert_eq!(sess.version, "2.1.168");
         assert_eq!(sess.entrypoint, "cli");
+    }
+
+    #[test]
+    fn test_history_entry_camelcase() {
+        // history.jsonl uses camelCase sessionId and millisecond timestamps.
+        let json = r#"{"display":"/ide","timestamp":1772699516370,"sessionId":"8e4a29cf"}"#;
+        let entry: HistoryEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.timestamp, 1772699516370);
+        assert_eq!(entry.session_id, "8e4a29cf", "sessionId must map to session_id");
     }
 
     #[test]

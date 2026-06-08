@@ -110,6 +110,10 @@ pub struct RateWindow {
     pub window_minutes: u64,
     /// When the window resets (ISO 8601)
     pub resets_at: Option<String>,
+    /// Optional display label (e.g. "Plan", "On-Demand"). When None, the UI
+    /// derives a label from window_minutes (Session / Weekly).
+    #[serde(default)]
+    pub label: Option<String>,
 }
 
 /// Token usage breakdown

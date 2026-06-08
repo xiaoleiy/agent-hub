@@ -72,3 +72,65 @@
 | 10:29 | Edited src-tauri/src/tui/mod.rs | modified draw_loading() | ~146 |
 | 10:31 | Fixed TUI: Tab can now reach Keep-Alive (tab_count=tab_names.len); lazy-load Proxy+agent tabs, tick refreshes only active tab; slimmed get_system_status | tui/mod.rs, system.rs | builds clean; 39/40 tests pass (1 env-only Cursor.app fail) | ~12k |
 | 10:31 | Session end: 8 writes across 2 files (system.rs, mod.rs) | 9 reads | ~26939 tok |
+| 10:39 | Session end: 8 writes across 2 files (system.rs, mod.rs) | 9 reads | ~26939 tok |
+| 11:09 | Session end: 8 writes across 2 files (system.rs, mod.rs) | 9 reads | ~26939 tok |
+| 11:10 | Session end: 8 writes across 2 files (system.rs, mod.rs) | 9 reads | ~26939 tok |
+| 11:22 | Edited src-tauri/src/core_modules/agents/claude.rs | 16→20 lines | ~160 |
+| 11:22 | Edited src-tauri/src/core_modules/agents/claude.rs | 6→8 lines | ~60 |
+| 11:22 | Edited src-tauri/src/core_modules/agents/claude.rs | added 2 import(s) | ~34 |
+| 11:23 | Edited src-tauri/src/core_modules/agents/claude.rs | added optional chaining | ~1291 |
+| 11:23 | Edited src-tauri/src/core_modules/agents/claude.rs | modified test_claude_session_json_parsing() | ~290 |
+| 11:24 | Edited src-tauri/src/core_modules/agents/codex.rs | modified codex_app_candidates() | ~150 |
+| 11:24 | Edited src-tauri/src/core_modules/agents/codex.rs | 3→3 lines | ~50 |
+| 11:24 | Edited src-tauri/src/core_modules/agents/codex.rs | modified exists() | ~67 |
+| 11:24 | Edited src-tauri/src/core_modules/agents/codex.rs | modified is_codex_running() | ~115 |
+| 11:24 | Edited src-tauri/src/core_modules/agents/codex.rs | modified get_codex_desktop_version() | ~143 |
+| 11:25 | Edited src-tauri/src/core_modules/agents/codex.rs | modified Ok() | ~220 |
+| 11:25 | Edited src-tauri/src/core_modules/agents/codex.rs | modified get_usage() | ~425 |
+| 11:26 | Edited src-tauri/src/core_modules/agents/codex.rs | added optional chaining | ~2090 |
+| 11:28 | Edited src-tauri/src/core_modules/agents/codex.rs | modified exists() | ~266 |
+| 11:28 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified count_active_conversations() | ~199 |
+| 11:28 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified prepare() | ~334 |
+| 11:28 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified test_cursor_agent_version_is_not_gui_version() | ~82 |
+| 11:29 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified test_detect_installed_consistent_with_paths() | ~107 |
+| 11:29 | Edited src-tauri/src/core_modules/keepalive.rs | modified is_caffeinate() | ~194 |
+| 11:29 | Edited src-tauri/src/core_modules/network.rs | modified get_network_info() | ~136 |
+| 11:29 | Edited README.md | inline fix | ~11 |
+| 11:29 | Edited src-tauri/src/cli/mod.rs | inline fix | ~16 |
+| 11:32 | Expert review + fixed all data/perf/robustness bugs: Claude camelCase, Codex cumulative-token/window/path, Cursor schema, mtime caching, pgrep -x, keepalive PID guard, network timeout | agents/{claude,codex,cursor}.rs, keepalive.rs, network.rs, README.md, cli/mod.rs | 41 tests pass; verified vs real data (Claude ids, Codex 5h=3/1m=46, GUI ver) | ~60k |
+| 11:33 | Session end: 30 writes across 8 files (system.rs, mod.rs, claude.rs, codex.rs, cursor.rs) | 15 reads | ~47050 tok |
+| 11:39 | Edited src-tauri/src/core_modules/agents/claude.rs | modified exists() | ~617 |
+| 11:39 | Edited src-tauri/src/core_modules/agents/claude.rs | modified get_claude_cli_version() | ~473 |
+| 11:40 | Edited src-tauri/src/core_modules/agents/codex.rs | modified get_codex_cli_version() | ~308 |
+| 11:40 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified tracking_db_path() | ~127 |
+| 11:40 | Edited src-tauri/src/core_modules/agents/cursor.rs | 3→3 lines | ~38 |
+| 11:40 | Edited src-tauri/src/core_modules/agents/cursor.rs | 5→1 lines | ~22 |
+| 11:40 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified get_cursor_gui_version() | ~143 |
+| 11:40 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified is_some() | ~61 |
+| 11:42 | Fixed CLI/GUI version detection: Claude prefer session+PATH (was stale ~/.local/bin), Codex codex --version (was version.json), Cursor+Claude GUI via ~/Apps & Claude.app candidates | agents/{claude,codex,cursor}.rs | 41 tests pass; verified all 6 versions match real | ~25k |
+| 11:43 | Session end: 38 writes across 8 files (system.rs, mod.rs, claude.rs, codex.rs, cursor.rs) | 15 reads | ~48966 tok |
+
+## Session: 2026-06-08 12:25
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 12:30 | Edited src-tauri/src/core_modules/agents/claude.rs | 8→10 lines | ~87 |
+| 12:30 | Edited src-tauri/src/core_modules/agents/claude.rs | expanded (+6 lines) | ~147 |
+| 12:30 | Edited src-tauri/src/core_modules/agents/claude.rs | modified claude_oauth_token() | ~1102 |
+| 12:31 | Edited src-tauri/src/cli/handlers.rs | modified usage() | ~598 |
+| 12:33 | Added Claude rate-limit section (CodexBar-style): OAuth token from .credentials.json/Keychain -> api.anthropic.com/api/oauth/usage -> five_hour/seven_day; cached 60s; usage CLI now shows limits | agents/claude.rs, cli/handlers.rs | verified live: Claude 31% session/19% weekly; 41 tests pass | ~40k |
+| 13:24 | Edited src-tauri/src/models/types.rs | 10→14 lines | ~148 |
+| 13:24 | Edited src-tauri/src/core_modules/agents/codex.rs | 8→9 lines | ~83 |
+| 13:24 | Edited src-tauri/src/core_modules/agents/claude.rs | 5→6 lines | ~49 |
+| 13:24 | Edited src-tauri/src/tui/mod.rs | 9→11 lines | ~144 |
+| 13:24 | Edited src-tauri/Cargo.toml | 2→7 lines | ~67 |
+| 13:26 | Created src-tauri/src/core_modules/agents/cursor_cookies.rs | — | ~2817 |
+| 13:26 | Edited src-tauri/src/core_modules/agents/mod.rs | 3→4 lines | ~19 |
+| 13:26 | Edited src-tauri/src/core_modules/agents/cursor.rs | added 3 import(s) | ~68 |
+| 13:27 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified fetch_cursor_rate_limits() | ~1137 |
+| 13:27 | Edited src-tauri/src/tui/mod.rs | 3→5 lines | ~56 |
+| 13:27 | Edited src-tauri/src/cli/handlers.rs | 3→5 lines | ~61 |
+| 13:27 | Edited src-tauri/Cargo.toml | inline fix | ~21 |
+| 13:32 | Edited src-tauri/src/core_modules/agents/cursor_cookies.rs | modified find_cursor_session_cookie() | ~171 |
+| 13:34 | Added Cursor rate limits via browser-cookie import (Chrome AES-CBC+Keychain, Firefox/Safari); cursor.com/api/usage-summary -> Plan/On-Demand windows; added RateWindow.label | agents/cursor_cookies.rs(new), cursor.rs, types.rs, tui/mod.rs, cli/handlers.rs, Cargo.toml | builds; 41 tests pass; Cursor UNVERIFIED (Keychain prompt blocks headless verify) | ~70k |
+| 13:34 | Session end: 17 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 1 reads | ~9990 tok |

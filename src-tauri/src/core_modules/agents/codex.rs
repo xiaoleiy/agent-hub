@@ -1,9 +1,24 @@
 use crate::models::types::{AgentInfo, AgentType, AgentUsage, ModelUsage, RateWindow, Session, TokenUsage, UsageStats};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::SystemTime;
+
+/// Candidate locations for the Codex desktop app (varies by install method).
+fn codex_app_candidates() -> Vec<PathBuf> {
+    vec![
+        PathBuf::from("/Applications/Codex.app"),
+        home().join("Applications/Codex.app"),
+        home().join("Apps/Codex.app"),
+    ]
+}
+
+fn codex_app_path() -> Option<PathBuf> {
+    codex_app_candidates().into_iter().find(|p| p.exists())
+}
 
 fn home() -> PathBuf {
     dirs_next::home_dir().unwrap_or_else(|| PathBuf::from("."))
@@ -24,8 +39,8 @@ fn process_manager_path() -> PathBuf {
 /// Detect Codex CLI installation and running state
 pub fn detect() -> AgentInfo {
     let codex_bin = PathBuf::from("/opt/homebrew/bin/codex");
-    let codex_app = PathBuf::from("/Applications/Codex.app");
-    let installed = codex_bin.exists() || codex_dir().exists() || codex_app.exists();
+    let codex_app = codex_app_path();
+    let installed = codex_bin.exists() || codex_dir().exists() || codex_app.is_some();
 
     // Check live processes
     let live_processes = get_live_pids();
@@ -57,8 +72,8 @@ pub fn detect() -> AgentInfo {
         gui_version,
         install_path: if codex_bin.exists() {
             Some(codex_bin.to_string_lossy().to_string())
-        } else if codex_app.exists() {
-            Some(codex_app.to_string_lossy().to_string())
+        } else if let Some(ref app) = codex_app {
+            Some(app.to_string_lossy().to_string())
         } else {
             None
         },
@@ -66,8 +81,11 @@ pub fn detect() -> AgentInfo {
 }
 
 fn is_codex_running() -> bool {
+    // -x matches the exact process name "codex". `-f codex` matched any process
+    // whose full command line / env contained "codex" (e.g. unrelated MCP servers
+    // with .codex in their PATH), producing false "running" states.
     std::process::Command::new("pgrep")
-        .arg("-f")
+        .arg("-x")
         .arg("codex")
         .output()
         .map(|o| !o.stdout.is_empty())
@@ -139,6 +157,21 @@ fn count_sessions_by_mode() -> (usize, usize) {
 }
 
 fn get_codex_cli_version() -> Option<String> {
+    // Prefer the actual installed binary. `codex --version` prints e.g.
+    // "codex-cli 0.130.0" — take the first version-looking token.
+    if let Ok(output) = std::process::Command::new("codex").arg("--version").output() {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(tok) = stdout
+                .split_whitespace()
+                .find(|t| t.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+            {
+                return Some(tok.to_string());
+            }
+        }
+    }
+    // Fallback (e.g. GUI launch with no PATH): version.json holds the update
+    // checker's "latest_version" — an approximation, NOT necessarily installed.
     let version_path = codex_dir().join("version.json");
     if let Ok(data) = std::fs::read_to_string(&version_path) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&data) {
@@ -147,16 +180,12 @@ fn get_codex_cli_version() -> Option<String> {
             }
         }
     }
-    if let Ok(output) = std::process::Command::new("codex").arg("--version").output() {
-        if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
-        }
-    }
     None
 }
 
 fn get_codex_desktop_version() -> Option<String> {
-    let plist = PathBuf::from("/Applications/Codex.app/Contents/Info.plist");
+    let app = codex_app_path()?;
+    let plist = app.join("Contents/Info.plist");
     if plist.exists() {
         if let Ok(output) = std::process::Command::new("defaults")
             .arg("read")
@@ -200,13 +229,16 @@ pub fn get_sessions() -> Vec<Session> {
             let source: String = row.get(2).unwrap_or_default();
             let model: String = row.get(3).unwrap_or_default();
             let cwd: String = row.get(4).unwrap_or_default();
-            let updated_at: String = row.get(6).unwrap_or_default();
+            // updated_at is an INTEGER (epoch seconds), not text — read it as i64
+            // and format it, otherwise the Time column is blank.
+            let updated_at: i64 = row.get(6).unwrap_or(0);
+            let started = DateTime::from_timestamp(updated_at, 0).map(|d| d.to_rfc3339());
 
             Ok(Session {
                 id: if title.is_empty() { id } else { title },
                 agent: "Codex".to_string(),
                 status: source.clone(),
-                started_at: Some(updated_at),
+                started_at: started,
                 working_dir: if cwd.is_empty() { None } else { Some(cwd) },
                 model: if model.is_empty() { None } else { Some(model) },
                 pid: None,
@@ -223,10 +255,12 @@ pub fn get_sessions() -> Vec<Session> {
 pub fn get_usage(window: &str) -> UsageStats {
     let db_path = state_db_path();
     let window_secs = window_seconds(window);
-    let cutoff = Utc::now() - chrono::Duration::seconds(window_secs as i64);
-    let cutoff_str = cutoff.format("%Y-%m-%dT%H:%M:%S").to_string();
+    // threads.updated_at is an INTEGER epoch-seconds column. The previous code
+    // compared it against a formatted date STRING, which SQLite coerced to the
+    // number 2026 (numeric affinity) — making the window filter a no-op. Compare
+    // against an integer epoch instead.
+    let cutoff = Utc::now().timestamp() - window_secs as i64;
 
-    let mut total_interactions = 0usize;
     let mut session_count = 0usize;
 
     if db_path.exists() {
@@ -234,15 +268,11 @@ pub fn get_usage(window: &str) -> UsageStats {
             Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         {
             if let Ok(mut stmt) = conn.prepare(
-                "SELECT id, tokens_used FROM threads WHERE updated_at >= ?1 AND archived = 0",
+                "SELECT id FROM threads WHERE updated_at >= ?1 AND archived = 0",
             ) {
-                if let Ok(rows) = stmt.query_map([&cutoff_str], |row| {
-                    let tokens: i64 = row.get(1).unwrap_or(0);
-                    Ok(tokens as usize)
-                }) {
-                    for row in rows.flatten() {
+                if let Ok(rows) = stmt.query_map([cutoff], |_row| Ok(())) {
+                    for _ in rows.flatten() {
                         session_count += 1;
-                        total_interactions += row;
                     }
                 }
             }
@@ -253,7 +283,10 @@ pub fn get_usage(window: &str) -> UsageStats {
         agent: "Codex".to_string(),
         window: window.to_string(),
         total_sessions: session_count,
-        total_interactions,
+        // Codex has no per-message count in this table; report active threads as
+        // the activity count. (Previously this summed tokens_used, which made the
+        // cross-agent dashboard chart compare token totals against message counts.)
+        total_interactions: session_count,
         first_activity: None,
         last_activity: None,
     }
@@ -287,39 +320,35 @@ pub fn get_rich_usage() -> AgentUsage {
         }
     }
 
-    // Parse JSONL files for token data and rate limits
-    let mut tokens = TokenUsage {
-        input_tokens: 0,
-        cache_read_tokens: 0,
-        cache_create_tokens: 0,
-        output_tokens: 0,
-        total_tokens: 0,
+    // Aggregate token usage + most-recent rate limits across all session files.
+    let agg = aggregate_codex_sessions(&sessions_dir);
+
+    let tokens = TokenUsage {
+        input_tokens: agg.input,
+        cache_read_tokens: agg.cached,
+        cache_create_tokens: 0, // Codex doesn't report cache-creation separately
+        output_tokens: agg.output,
+        total_tokens: agg.total,
     };
-    let mut model_map: HashMap<String, (u64, u64, usize)> = HashMap::new();
-    let mut session_window: Option<RateWindow> = None;
-    let mut weekly_window: Option<RateWindow> = None;
 
-    if sessions_dir.exists() {
-        collect_codex_jsonl(&sessions_dir, &mut tokens, &mut model_map, &mut session_window, &mut weekly_window);
-    }
+    let model_breakdowns = if agg.total > 0 {
+        vec![ModelUsage {
+            model: "codex".to_string(),
+            input_tokens: agg.input + agg.cached,
+            output_tokens: agg.output,
+            total_tokens: agg.total,
+            request_count: agg.session_files,
+        }]
+    } else {
+        vec![]
+    };
 
-    let model_breakdowns: Vec<ModelUsage> = model_map
-        .into_iter()
-        .map(|(model, (inp, out, count))| ModelUsage {
-            model,
-            input_tokens: inp,
-            output_tokens: out,
-            total_tokens: inp + out,
-            request_count: count,
-        })
-        .collect();
-
-    let has_tokens = tokens.total_tokens > 0;
+    let has_tokens = agg.total > 0;
 
     AgentUsage {
         agent: "Codex".to_string(),
-        session_window,
-        weekly_window,
+        session_window: agg.primary.map(RateSnapshot::into_window),
+        weekly_window: agg.secondary.map(RateSnapshot::into_window),
         tokens: if has_tokens { Some(tokens) } else { None },
         model_breakdowns,
         total_interactions: 0, // Not meaningful for Codex
@@ -327,40 +356,144 @@ pub fn get_rich_usage() -> AgentUsage {
     }
 }
 
-/// Recursively scan JSONL files under the Codex sessions directory
-fn collect_codex_jsonl(
-    dir: &PathBuf,
-    tokens: &mut TokenUsage,
-    model_map: &mut HashMap<String, (u64, u64, usize)>,
-    session_window: &mut Option<RateWindow>,
-    weekly_window: &mut Option<RateWindow>,
-) {
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
+/// A rate-limit snapshot from a Codex `token_count` event.
+#[derive(Clone)]
+struct RateSnapshot {
+    used_percent: f64,
+    window_minutes: u64,
+    resets_at: Option<i64>, // epoch seconds
+}
 
-    for entry in entries.filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_codex_jsonl(&path, tokens, model_map, session_window, weekly_window);
-        } else if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
-            parse_codex_jsonl(&path, tokens, model_map, session_window, weekly_window);
+impl RateSnapshot {
+    fn into_window(self) -> RateWindow {
+        RateWindow {
+            used_percent: self.used_percent,
+            window_minutes: self.window_minutes,
+            resets_at: self
+                .resets_at
+                .and_then(|s| DateTime::from_timestamp(s, 0))
+                .map(|d| d.to_rfc3339()),
+            label: None,
         }
     }
 }
 
-/// Parse a Codex JSONL file for token_count events
-fn parse_codex_jsonl(
-    path: &PathBuf,
-    tokens: &mut TokenUsage,
-    model_map: &mut HashMap<String, (u64, u64, usize)>,
-    session_window: &mut Option<RateWindow>,
-    weekly_window: &mut Option<RateWindow>,
-) {
+/// Per-session-file aggregate. Codex's `total_token_usage` is a CUMULATIVE
+/// running total, so the final event in a file is the session's grand total —
+/// we keep the last value rather than summing events (which over-counted).
+#[derive(Clone, Default)]
+struct CodexFileAgg {
+    input: u64,
+    cached: u64,
+    output: u64,
+    total: u64,
+    primary: Option<RateSnapshotData>,
+    secondary: Option<RateSnapshotData>,
+}
+
+#[derive(Clone, Default)]
+struct RateSnapshotData {
+    used_percent: f64,
+    window_minutes: u64,
+    resets_at: Option<i64>,
+}
+
+/// Aggregate across all session files, with a top-level (cross-file) result.
+#[derive(Default)]
+struct CodexAggregate {
+    input: u64,
+    cached: u64,
+    output: u64,
+    total: u64,
+    session_files: usize,
+    primary: Option<RateSnapshot>,
+    secondary: Option<RateSnapshot>,
+}
+
+// Re-reading every rollout file each refresh is expensive; cache each file's
+// aggregate keyed by mtime so only the active (growing) file is re-parsed.
+static CODEX_TOKEN_CACHE: Mutex<Option<HashMap<PathBuf, (SystemTime, CodexFileAgg)>>> =
+    Mutex::new(None);
+
+/// Walk the sessions dir, summing each session's FINAL cumulative totals and
+/// taking rate limits from the most-recently-modified file.
+fn aggregate_codex_sessions(dir: &Path) -> CodexAggregate {
+    let mut out = CodexAggregate::default();
+    let mut newest: Option<SystemTime> = None;
+    walk_codex_files(dir, &mut |path, mtime, agg| {
+        if agg.total > 0 {
+            out.input += agg.input;
+            out.cached += agg.cached;
+            out.output += agg.output;
+            out.total += agg.total;
+            out.session_files += 1;
+        }
+        // Rate limits: keep the snapshot from the newest file that has one.
+        let is_newer = newest.map(|n| mtime > n).unwrap_or(true);
+        if is_newer && (agg.primary.is_some() || agg.secondary.is_some()) {
+            newest = Some(mtime);
+            out.primary = agg.primary.clone().map(snapshot_from_data);
+            out.secondary = agg.secondary.clone().map(snapshot_from_data);
+        }
+        let _ = path;
+    });
+    out
+}
+
+fn snapshot_from_data(d: RateSnapshotData) -> RateSnapshot {
+    RateSnapshot {
+        used_percent: d.used_percent,
+        window_minutes: d.window_minutes,
+        resets_at: d.resets_at,
+    }
+}
+
+/// Recurse the sessions dir, yielding each .jsonl file's cached aggregate.
+fn walk_codex_files(dir: &Path, f: &mut impl FnMut(&Path, SystemTime, &CodexFileAgg)) {
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            walk_codex_files(&path, f);
+        } else if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
+            if let Some((mtime, agg)) = codex_file_agg(&path) {
+                f(&path, mtime, &agg);
+            }
+        }
+    }
+}
+
+/// Return a file's aggregate + mtime, using the cache when unchanged.
+fn codex_file_agg(path: &Path) -> Option<(SystemTime, CodexFileAgg)> {
+    let mtime = fs::metadata(path).ok()?.modified().ok()?;
+    if let Ok(guard) = CODEX_TOKEN_CACHE.lock() {
+        if let Some(map) = guard.as_ref() {
+            if let Some((cached_mtime, agg)) = map.get(path) {
+                if *cached_mtime == mtime {
+                    return Some((mtime, agg.clone()));
+                }
+            }
+        }
+    }
+    let agg = parse_codex_jsonl(path);
+    if let Ok(mut guard) = CODEX_TOKEN_CACHE.lock() {
+        guard
+            .get_or_insert_with(HashMap::new)
+            .insert(path.to_path_buf(), (mtime, agg.clone()));
+    }
+    Some((mtime, agg))
+}
+
+/// Parse one Codex rollout file: keep the LAST token_count totals (cumulative)
+/// and the last rate-limit snapshot.
+fn parse_codex_jsonl(path: &Path) -> CodexFileAgg {
+    let mut agg = CodexFileAgg::default();
     let content = match fs::read_to_string(path) {
         Ok(c) => c,
-        Err(_) => return,
+        Err(_) => return agg,
     };
 
     for line in content.lines() {
@@ -369,7 +502,6 @@ fn parse_codex_jsonl(
             Err(_) => continue,
         };
 
-        // Look for event_msg with type "token_count"
         if v.get("type").and_then(|t| t.as_str()) != Some("event_msg") {
             continue;
         }
@@ -381,55 +513,41 @@ fn parse_codex_jsonl(
             continue;
         }
 
-        // Extract token usage
-        let info = match payload.get("info") {
-            Some(i) => i,
-            None => continue,
-        };
-        let total_usage = match info.get("total_token_usage") {
-            Some(u) => u,
-            None => continue,
-        };
+        if let Some(total_usage) = payload.pointer("/info/total_token_usage") {
+            let inp = total_usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let cached = total_usage.get("cached_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let out = total_usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let reasoning = total_usage.get("reasoning_output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let reported_total = total_usage.get("total_tokens").and_then(|v| v.as_u64());
 
-        let inp = total_usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-        let cached = total_usage.get("cached_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-        let out = total_usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-        let reasoning = total_usage.get("reasoning_output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            // Cumulative — overwrite with the latest event's running totals.
+            agg.input = inp;
+            agg.cached = cached;
+            agg.output = out + reasoning;
+            agg.total = reported_total.unwrap_or(inp + out + reasoning);
+        }
 
-        tokens.input_tokens += inp;
-        tokens.cache_read_tokens += cached;
-        tokens.output_tokens += out + reasoning;
-        tokens.total_tokens += inp + out + reasoning;
-
-        // Extract model from turn_context (look backwards in file for model)
-        // For now, use "codex" as default model name
-        let model = "codex".to_string();
-        let entry = model_map.entry(model).or_insert((0, 0, 0));
-        entry.0 += inp + cached;
-        entry.1 += out + reasoning;
-        entry.2 += 1;
-
-        // Extract rate limits
         if let Some(rate_limits) = payload.get("rate_limits") {
             if let Some(primary) = rate_limits.get("primary") {
-                let used = primary.get("used_percent").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let mins = primary.get("window_minutes").and_then(|v| v.as_u64()).unwrap_or(300);
-                *session_window = Some(RateWindow {
-                    used_percent: used,
-                    window_minutes: mins,
-                    resets_at: None, // Would need to compute from window_minutes
-                });
+                agg.primary = Some(parse_rate(primary, 300));
             }
             if let Some(secondary) = rate_limits.get("secondary") {
-                let used = secondary.get("used_percent").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let mins = secondary.get("window_minutes").and_then(|v| v.as_u64()).unwrap_or(10080);
-                *weekly_window = Some(RateWindow {
-                    used_percent: used,
-                    window_minutes: mins,
-                    resets_at: None,
-                });
+                agg.secondary = Some(parse_rate(secondary, 10080));
             }
         }
+    }
+
+    agg
+}
+
+fn parse_rate(v: &serde_json::Value, default_minutes: u64) -> RateSnapshotData {
+    RateSnapshotData {
+        used_percent: v.get("used_percent").and_then(|x| x.as_f64()).unwrap_or(0.0),
+        window_minutes: v
+            .get("window_minutes")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(default_minutes),
+        resets_at: v.get("resets_at").and_then(|x| x.as_i64()),
     }
 }
 

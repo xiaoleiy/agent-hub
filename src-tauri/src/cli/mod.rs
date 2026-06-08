@@ -18,7 +18,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Show network information (public IP from ip.net.coffee)
+    /// Show network information (public IP from ipinfo.io)
     Network {
         /// Output as JSON
         #[arg(long)]

@@ -220,6 +220,7 @@ pub fn sessions(agent_filter: Option<String>, json: bool) {
 pub fn usage(window: &str, agent_filter: Option<String>, json: bool) {
     let all_agents = agents::detect_all_agents();
     let mut all_usage = Vec::new();
+    let mut all_rich = Vec::new();
 
     for agent in &all_agents {
         if let Some(ref filter) = agent_filter {
@@ -229,12 +230,13 @@ pub fn usage(window: &str, agent_filter: Option<String>, json: bool) {
                 }
             }
         }
-        let usage = agents::get_usage(&agent.agent_type, window);
-        all_usage.push(usage);
+        all_usage.push(agents::get_usage(&agent.agent_type, window));
+        all_rich.push(agents::get_rich_usage(&agent.agent_type));
     }
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&all_usage).unwrap());
+        // Rich usage carries rate-limit windows + token breakdowns.
+        println!("{}", serde_json::to_string_pretty(&all_rich).unwrap());
         return;
     }
 
@@ -243,14 +245,47 @@ pub fn usage(window: &str, agent_filter: Option<String>, json: bool) {
         format!("Usage Statistics (window: {})", window).bold().underline()
     );
 
-    for u in &all_usage {
+    for (u, r) in all_usage.iter().zip(all_rich.iter()) {
         println!(
             "  {} {} sessions, {} interactions",
             u.agent.bold(),
             u.total_sessions.to_string().cyan(),
             u.total_interactions.to_string().cyan()
         );
+        if let Some(w) = &r.session_window {
+            println!("      {} {}", "Session limit:".dimmed(), format_rate_window(w));
+        }
+        if let Some(w) = &r.weekly_window {
+            println!("      {} {}", "Weekly limit: ".dimmed(), format_rate_window(w));
+        }
+        if let Some(t) = &r.tokens {
+            println!(
+                "      {} {} total ({} in / {} out)",
+                "Tokens:".dimmed(),
+                t.total_tokens.to_string().cyan(),
+                t.input_tokens,
+                t.output_tokens
+            );
+        }
     }
+}
+
+fn format_rate_window(w: &crate::models::types::RateWindow) -> String {
+    let label = if w.window_minutes >= 43200 {
+        format!("{}mo", w.window_minutes / 43200)
+    } else if w.window_minutes >= 10080 {
+        format!("{}w", w.window_minutes / 10080)
+    } else if w.window_minutes >= 60 {
+        format!("{}h", w.window_minutes / 60)
+    } else {
+        format!("{}m", w.window_minutes)
+    };
+    let reset = w
+        .resets_at
+        .as_deref()
+        .map(|r| format!(", resets {}", r))
+        .unwrap_or_default();
+    format!("{:.0}% used ({} window{})", w.used_percent, label, reset)
 }
 
 pub fn keepalive(mode: Option<String>, status_flag: bool) {
