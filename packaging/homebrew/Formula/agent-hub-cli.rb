@@ -23,7 +23,11 @@ class AgentHubCli < Formula
   end
 
   def install
-    bin.install "Agent Hub.app/Contents/MacOS/agent-hub" => "agent-hub"
+    # Homebrew may strip the single top-level "Agent Hub.app" dir on extract,
+    # so locate the binary wherever it landed.
+    binary = Dir.glob("**/Contents/MacOS/agent-hub").first
+    odie "agent-hub binary not found in release archive" if binary.nil?
+    bin.install binary => "agent-hub"
   end
 
   test do
