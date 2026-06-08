@@ -39,7 +39,8 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "-"
     },
     "category": "DeveloperTool",
     "shortDescription": "Manage AI coding agents on your machine",
