@@ -110,6 +110,8 @@ jobs:
             --repo "${{ github.repository }}" \
             --pattern "Agent.Hub_${VERSION}_aarch64.dmg" \
             --pattern "Agent.Hub_${VERSION}_x64.dmg" \
+            --pattern "Agent.Hub_aarch64.app.tar.gz" \
+            --pattern "Agent.Hub_x64.app.tar.gz" \
             --dir dist
           ls -la dist
 
@@ -121,8 +123,12 @@ jobs:
           set -euo pipefail
           ARM_SHA=$(sha256sum "dist/Agent.Hub_${VERSION}_aarch64.dmg" | cut -d' ' -f1)
           INTEL_SHA=$(sha256sum "dist/Agent.Hub_${VERSION}_x64.dmg"     | cut -d' ' -f1)
-          echo "arm_sha=${ARM_SHA}"     >> "$GITHUB_OUTPUT"
-          echo "intel_sha=${INTEL_SHA}" >> "$GITHUB_OUTPUT"
+          TARBALL_ARM_SHA=$(sha256sum "dist/Agent.Hub_aarch64.app.tar.gz" | cut -d' ' -f1)
+          TARBALL_INTEL_SHA=$(sha256sum "dist/Agent.Hub_x64.app.tar.gz"     | cut -d' ' -f1)
+          echo "arm_sha=${ARM_SHA}"                 >> "$GITHUB_OUTPUT"
+          echo "intel_sha=${INTEL_SHA}"             >> "$GITHUB_OUTPUT"
+          echo "tarball_arm_sha=${TARBALL_ARM_SHA}"     >> "$GITHUB_OUTPUT"
+          echo "tarball_intel_sha=${TARBALL_INTEL_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
@@ -139,9 +145,9 @@ jobs:
         run: |
           set -euo pipefail
           CASK="homebrew-tap/Casks/agent-hub.rb"
-          sed -i -E "s|^(\s*version\s+).*|\1\"${VERSION}\"|" "$CASK"
+          sed -i -E "s|^([[:space:]]*version[[:space:]]+).*|\1\"${VERSION}\"|" "$CASK"
           awk -v arm="$ARM_SHA" -v intel="$INTEL_SHA" '
-            /^\s*sha256\s+"/ {
+            /^[[:space:]]*sha256[[:space:]]+"/ {
               n++
               if (n == 1) { sub(/"[0-9a-fA-F]*"/, "\"" arm "\"") }
               else if (n == 2) { sub(/"[0-9a-fA-F]*"/, "\"" intel "\"") }
@@ -149,6 +155,25 @@ jobs:
             { print }
           ' "$CASK" > "${CASK}.tmp" && mv "${CASK}.tmp" "$CASK"
           echo "----- updated cask -----"; cat "$CASK"
+
+      - name: Rewrite Formula/agent-hub-cli.rb
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          ARM_SHA: ${{ steps.sha.outputs.tarball_arm_sha }}
+          INTEL_SHA: ${{ steps.sha.outputs.tarball_intel_sha }}
+        run: |
+          set -euo pipefail
+          F="homebrew-tap/Formula/agent-hub-cli.rb"
+          sed -i -E "s|^([[:space:]]*version[[:space:]]+).*|\1\"${VERSION}\"|" "$F"
+          awk -v arm="$ARM_SHA" -v intel="$INTEL_SHA" '
+            /^[[:space:]]*sha256[[:space:]]+"/ {
+              n++
+              if (n == 1) { sub(/"[0-9a-fA-F]*"/, "\"" arm "\"") }
+              else if (n == 2) { sub(/"[0-9a-fA-F]*"/, "\"" intel "\"") }
+            }
+            { print }
+          ' "$F" > "${F}.tmp" && mv "${F}.tmp" "$F"
+          cat "$F"
 
       - name: Commit and push
         working-directory: homebrew-tap
@@ -161,6 +186,6 @@ jobs:
           if git diff --quiet; then
             echo "No changes to commit."; exit 0
           fi
-          git add Casks/agent-hub.rb
+          git add Casks/agent-hub.rb Formula/agent-hub-cli.rb
           git commit -m "agent-hub ${VERSION}"
           git push
