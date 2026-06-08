@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T15:13:45.084Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T15:30:13.837Z
 > Files: 118 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../tmp/
@@ -206,7 +206,7 @@
 - `keepalive.rs` — State persisted to disk for keep-alive (~1426 tok)
 - `mod.rs` (~24 tok)
 - `network.rs` — Fetch public network information from ipinfo.io. (~136 tok)
-- `proxy.rs` — Gather all proxy/VPN information for the system (~5588 tok)
+- `proxy.rs` — Gather all proxy/VPN information for the system (~6837 tok)
 - `system.rs` — Gather current system status: CPU, RAM, uptime, network I/O, username. (~1494 tok)
 
 ## src-tauri/src/core_modules/agents/
@@ -221,11 +221,11 @@
 ## src-tauri/src/models/
 
 - `mod.rs` (~5 tok)
-- `types.rs` — System status information (~1619 tok)
+- `types.rs` — System status information (~1676 tok)
 
 ## src-tauri/src/tui/
 
-- `mod.rs` — run_tui (~14326 tok)
+- `mod.rs` — run_tui (~14689 tok)
 
 ## src/
 
@@ -237,7 +237,7 @@
 - `AgentTab.svelte` — Svelte: AgentTab (~4617 tok)
 - `KeepAlive.svelte` — Svelte: KeepAlive (~1046 tok)
 - `NetworkInfo.svelte` — Svelte: NetworkInfo (~455 tok)
-- `ProxyInfo.svelte` — Svelte: ProxyInfo (~3494 tok)
+- `ProxyInfo.svelte` — Svelte: ProxyInfo (~3564 tok)
 - `SessionList.svelte` — Svelte: SessionList, 1 stores (~965 tok)
 - `SystemStatus.svelte` — Svelte: SystemStatus (~930 tok)
 - `UsageChart.svelte` — Svelte: UsageChart, 2 stores (~492 tok)

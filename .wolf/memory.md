@@ -325,3 +325,21 @@
 | 23:13 | Edited src-tauri/src/core_modules/agents/opencode.rs | 20 → 30 | ~13 |
 | 23:13 | Edited src-tauri/src/core_modules/agents/codex.rs | inline fix | ~21 |
 | 23:13 | Edited src-tauri/src/core_modules/agents/cursor.rs | "SELECT conversationId, mo" → "SELECT conversationId, mo" | ~32 |
+| 23:15 | Session end: 115 writes across 17 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 19 reads | ~54513 tok |
+| 23:22 | Edited src/lib/components/ProxyInfo.svelte | 14→9 lines | ~70 |
+| 23:22 | Edited src-tauri/src/models/types.rs | 7→11 lines | ~101 |
+| 23:23 | Edited src-tauri/src/core_modules/proxy.rs | 8→9 lines | ~64 |
+| 23:24 | Edited src-tauri/src/core_modules/proxy.rs | 8→9 lines | ~58 |
+| 23:24 | Edited src-tauri/src/core_modules/proxy.rs | 7→8 lines | ~79 |
+| 23:24 | Edited src-tauri/src/core_modules/proxy.rs | modified try_clash_api() | ~160 |
+| 23:24 | Edited src-tauri/src/core_modules/proxy.rs | added optional chaining | ~1423 |
+| 23:24 | Edited src-tauri/src/core_modules/proxy.rs | removed 68 lines | ~53 |
+| 23:25 | Edited src/lib/components/ProxyInfo.svelte | 6→11 lines | ~129 |
+| 23:25 | Edited src-tauri/src/tui/mod.rs | modified is_some() | ~48 |
+| 23:25 | Edited src-tauri/src/core_modules/proxy.rs | modified parse_ext_ctl_unix() | ~346 |
+| 23:25 | Edited src-tauri/src/core_modules/proxy.rs | modified test_get_vpn_connections() | ~499 |
+| 23:26 | Edited src-tauri/src/core_modules/proxy.rs | modified test_clash_unix_socket_no_panic() | ~162 |
+| 23:27 | Edited src-tauri/src/core_modules/proxy.rs | modified test_clash_unix_socket_no_panic() | ~49 |
+| 23:30 | Edited src/lib/components/ProxyInfo.svelte | 3→3 lines | ~42 |
+| 23:57 | Flatten Proxy/VPN sections + fix Clash Verge Rev detection (unix-socket via curl --unix-socket; api_socket field; mode; GUI+TUI display; vv->v) | proxy.rs, types.rs, ProxyInfo.svelte, tui/mod.rs | 50 tests; live: Clash Verge v1.19.25 rule 19 groups; bug-052 | ~16000 |
+| 23:31 | Session end: 130 writes across 18 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 21 reads | ~77962 tok |

@@ -1339,7 +1339,11 @@ fn draw_proxy_client(
                 Style::default().fg(Color::DarkGray),
             ),
         ])];
-        let mut detail_parts = vec![format!("port: {}", c.api_port)];
+        let mut detail_parts = vec![if c.api_socket.is_some() {
+            "api: unix socket".to_string()
+        } else {
+            format!("port: {}", c.api_port)
+        }];
         if let Some(ref v) = c.version {
             detail_parts.push(format!("v{}", v));
         }

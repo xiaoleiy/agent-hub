@@ -138,14 +138,19 @@
           <div class="client-header">
             <span class="client-name">{info.active_client.name}</span>
             {#if info.active_client.version}
-              <span class="client-ver">v{info.active_client.version}</span>
+              <span class="client-ver">v{info.active_client.version.replace(/^v/, "")}</span>
             {/if}
             <span class="client-type">{info.active_client.client_type}</span>
           </div>
           <div class="client-details">
             <span class="detail">
-              <span class="detail-label">API Port</span>
-              <span class="detail-value">{info.active_client.api_port}</span>
+              {#if info.active_client.api_socket}
+                <span class="detail-label">API</span>
+                <span class="detail-value">unix socket</span>
+              {:else}
+                <span class="detail-label">API Port</span>
+                <span class="detail-value">{info.active_client.api_port}</span>
+              {/if}
             </span>
             {#if info.active_client.mode}
               <span class="detail">
@@ -208,16 +213,11 @@
   .proxy-info {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
   }
 
-  .section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px;
-  }
-
+  /* Flat sections (no outer card) — consistent with the agent tabs; the inner
+     cards (proxy-card, vpn-item, client-card, node-group) carry the surfaces. */
   .section h3 {
     font-size: 0.85rem;
     font-weight: 600;

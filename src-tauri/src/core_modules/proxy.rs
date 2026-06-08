@@ -268,6 +268,15 @@ fn detect_proxy_client() -> Option<crate::models::types::ProxyClient> {
         }
     }
 
+    // Try Clash/Mihomo over a Unix socket. Clash Verge Rev (current versions)
+    // disables the TCP controller (`external-controller: ''`) and exposes only
+    // `external-controller-unix`, so the TCP probes above all miss it.
+    if let Some(sock) = clash_unix_socket() {
+        if let Some(client) = try_clash_unix(&sock) {
+            return Some(client);
+        }
+    }
+
     // Try Surge API
     for port in [6171, 6170, 6166] {
         if let Some(client) = try_surge_api(port) {
@@ -307,7 +316,8 @@ fn try_clash_api(port: u16) -> Option<crate::models::types::ProxyClient> {
         client_type: "clash".to_string(),
         api_port: port,
         version: Some(version),
-        mode: None,
+        mode: clash_mode_tcp(port),
+        api_socket: None,
     })
 }
 
@@ -362,6 +372,7 @@ fn try_surge_api(port: u16) -> Option<crate::models::types::ProxyClient> {
         api_port: port,
         version: None,
         mode,
+        api_socket: None,
     })
 }
 
@@ -394,6 +405,7 @@ fn detect_proxy_process() -> Option<crate::models::types::ProxyClient> {
                 api_port: *port,
                 version: None,
                 mode: None,
+                api_socket: None,
             });
         }
     }
@@ -417,38 +429,117 @@ fn get_proxy_nodes(client: &Option<crate::models::types::ProxyClient>) -> Vec<Pr
     };
 
     match client.client_type.as_str() {
-        "clash" => get_clash_nodes(client.api_port),
+        "clash" => match &client.api_socket {
+            Some(sock) => get_clash_nodes_unix(sock),
+            None => get_clash_nodes(client.api_port),
+        },
         "surge" => get_surge_nodes(client.api_port),
         _ => vec![],
     }
 }
 
-/// Fetch proxy nodes from Clash/Mihomo API
-fn get_clash_nodes(port: u16) -> Vec<ProxyNode> {
-    let url = format!("http://127.0.0.1:{}/proxies", port);
-    let rt = match tokio::runtime::Runtime::new() {
-        Ok(r) => r,
-        Err(_) => return vec![],
-    };
+/// Parse the `-ext-ctl-unix <path>` token out of a `ps` args dump (pure).
+fn parse_ext_ctl_unix(args_text: &str) -> Option<String> {
+    for line in args_text.lines() {
+        if let Some(idx) = line.find("-ext-ctl-unix") {
+            let rest = &line[idx + "-ext-ctl-unix".len()..];
+            if let Some(tok) = rest.split_whitespace().next() {
+                if !tok.is_empty() {
+                    return Some(tok.to_string());
+                }
+            }
+        }
+    }
+    None
+}
 
-    let resp = rt.block_on(async {
-        reqwest::Client::new()
-            .get(&url)
-            .timeout(std::time::Duration::from_secs(2))
-            .send()
-            .await
+/// Discover the Clash/Mihomo external-controller Unix socket path.
+fn clash_unix_socket() -> Option<String> {
+    // Preferred: read the live mihomo process's `-ext-ctl-unix <path>` argument
+    // (works regardless of where the config lives or what path was chosen).
+    if let Ok(out) = Command::new("ps").args(["-axww", "-o", "args="]).output() {
+        let text = String::from_utf8_lossy(&out.stdout);
+        if let Some(path) = parse_ext_ctl_unix(&text) {
+            if std::path::Path::new(&path).exists() {
+                return Some(path);
+            }
+        }
+    }
+    // Fallback: Clash Verge Rev's default socket location.
+    let default = "/tmp/verge/verge-mihomo.sock";
+    if std::path::Path::new(default).exists() {
+        return Some(default.to_string());
+    }
+    None
+}
+
+/// GET a JSON document from a Clash/Mihomo API exposed over a Unix socket.
+/// Uses `curl --unix-socket` (ships with macOS) — consistent with the other
+/// system shell-outs and avoids a chunked-encoding hand-roll. The Unix socket
+/// is local-trusted by mihomo, so no `secret` is required.
+fn curl_unix_json(socket: &str, path: &str) -> Option<serde_json::Value> {
+    let url = format!("http://localhost{}", path);
+    let out = Command::new("curl")
+        .args(["-s", "-m", "2", "--unix-socket", socket, &url])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    serde_json::from_slice(&out.stdout).ok()
+}
+
+/// Probe a Clash/Mihomo controller over a Unix socket.
+fn try_clash_unix(socket: &str) -> Option<crate::models::types::ProxyClient> {
+    let body = curl_unix_json(socket, "/version")?;
+    let version = body.get("version")?.as_str()?.to_string();
+    let mode = curl_unix_json(socket, "/configs").and_then(|c| {
+        c.get("mode")
+            .and_then(|m| m.as_str())
+            .map(|s| s.to_string())
     });
+    Some(crate::models::types::ProxyClient {
+        name: identify_clash_variant(0),
+        client_type: "clash".to_string(),
+        api_port: 0,
+        version: Some(version),
+        mode,
+        api_socket: Some(socket.to_string()),
+    })
+}
 
-    let resp = match resp {
-        Ok(r) if r.status().is_success() => r,
-        _ => return vec![],
-    };
+/// Fetch the current Clash mode (rule/global/direct) from a TCP controller.
+fn clash_mode_tcp(port: u16) -> Option<String> {
+    let url = format!("http://127.0.0.1:{}/configs", port);
+    let rt = tokio::runtime::Runtime::new().ok()?;
+    let resp = rt
+        .block_on(async {
+            reqwest::Client::new()
+                .get(&url)
+                .timeout(std::time::Duration::from_millis(500))
+                .send()
+                .await
+        })
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let body: serde_json::Value = rt.block_on(resp.json()).ok()?;
+    body.get("mode")
+        .and_then(|m| m.as_str())
+        .map(|s| s.to_string())
+}
 
-    let body: serde_json::Value = match rt.block_on(resp.json()) {
-        Ok(b) => b,
-        Err(_) => return vec![],
-    };
+/// Fetch proxy nodes from a Clash/Mihomo API exposed over a Unix socket.
+fn get_clash_nodes_unix(socket: &str) -> Vec<ProxyNode> {
+    match curl_unix_json(socket, "/proxies") {
+        Some(body) => parse_clash_proxies(&body),
+        None => vec![],
+    }
+}
 
+/// Parse the `/proxies` response into selector/test/fallback group nodes.
+fn parse_clash_proxies(body: &serde_json::Value) -> Vec<ProxyNode> {
     let proxies = match body.get("proxies").and_then(|p| p.as_object()) {
         Some(p) => p,
         None => return vec![],
@@ -509,6 +600,35 @@ fn get_clash_nodes(port: u16) -> Vec<ProxyNode> {
     }
 
     nodes
+}
+
+/// Fetch proxy nodes from Clash/Mihomo API
+fn get_clash_nodes(port: u16) -> Vec<ProxyNode> {
+    let url = format!("http://127.0.0.1:{}/proxies", port);
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(_) => return vec![],
+    };
+
+    let resp = rt.block_on(async {
+        reqwest::Client::new()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(2))
+            .send()
+            .await
+    });
+
+    let resp = match resp {
+        Ok(r) if r.status().is_success() => r,
+        _ => return vec![],
+    };
+
+    let body: serde_json::Value = match rt.block_on(resp.json()) {
+        Ok(b) => b,
+        Err(_) => return vec![],
+    };
+
+    parse_clash_proxies(&body)
 }
 
 /// Fetch proxy nodes from Surge API
@@ -655,5 +775,44 @@ mod tests {
     fn test_get_vpn_connections() {
         // Just verify it doesn't panic
         let _vpns = get_vpn_connections();
+    }
+
+    #[test]
+    fn test_parse_ext_ctl_unix() {
+        let args = "/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo -d /Users/x/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev -f /Users/x/.../clash-verge.yaml -ext-ctl-unix /tmp/verge/verge-mihomo.sock\n/usr/sbin/cfprefsd";
+        assert_eq!(
+            parse_ext_ctl_unix(args),
+            Some("/tmp/verge/verge-mihomo.sock".to_string())
+        );
+        assert_eq!(parse_ext_ctl_unix("no socket here\nfoo bar"), None);
+    }
+
+    #[test]
+    fn test_parse_clash_proxies() {
+        // Only Selector/URLTest/Fallback/LoadBalance become nodes; plain proxies
+        // are skipped.
+        let body: serde_json::Value = serde_json::from_str(
+            r#"{"proxies":{
+                "Auto":{"type":"URLTest","name":"Auto","now":"HK","all":["HK","JP"],
+                        "history":[{"delay":42}]},
+                "HK":{"type":"Shadowsocks","name":"HK"},
+                "Proxy":{"type":"Selector","name":"Proxy","now":"Auto","all":["Auto","HK"],"history":[]}
+            }}"#,
+        )
+        .unwrap();
+        let mut nodes = parse_clash_proxies(&body);
+        nodes.sort_by(|a, b| a.name.cmp(&b.name));
+        assert_eq!(nodes.len(), 2, "two groups, the plain SS proxy excluded");
+        let auto = nodes.iter().find(|n| n.name == "Auto").unwrap();
+        assert_eq!(auto.selected, "HK");
+        assert_eq!(auto.delay, Some(42));
+        assert_eq!(auto.node_type, "URLTest");
+        assert_eq!(auto.available_nodes, vec!["HK", "JP"]);
+    }
+
+    #[test]
+    fn test_clash_unix_socket_no_panic() {
+        // May or may not find a socket depending on the machine; must not panic.
+        let _ = clash_unix_socket();
     }
 }

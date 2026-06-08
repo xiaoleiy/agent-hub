@@ -83,8 +83,8 @@
       "first_read": "2026-06-08T14:11:11.654Z"
     },
     "/Users/xiaoleiyu/Repos/agent-hub/src/lib/components/ProxyInfo.svelte": {
-      "count": 3,
-      "tokens": 3482,
+      "count": 5,
+      "tokens": 3502,
       "first_read": "2026-06-08T14:11:17.468Z"
     },
     "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/claude.rs": {
@@ -96,6 +96,16 @@
       "count": 1,
       "tokens": 4642,
       "first_read": "2026-06-08T15:13:37.713Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs": {
+      "count": 1,
+      "tokens": 5588,
+      "first_read": "2026-06-08T15:18:14.645Z"
+    },
+    "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/tui/mod.rs": {
+      "count": 1,
+      "tokens": 14326,
+      "first_read": "2026-06-08T15:25:17.879Z"
     }
   },
   "files_written": [
@@ -788,11 +798,101 @@
       "action": "edit",
       "tokens": 34,
       "at": "2026-06-08T15:13:45.091Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src/lib/components/ProxyInfo.svelte",
+      "action": "edit",
+      "tokens": 74,
+      "at": "2026-06-08T15:22:45.438Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/models/types.rs",
+      "action": "edit",
+      "tokens": 108,
+      "at": "2026-06-08T15:22:55.378Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 69,
+      "at": "2026-06-08T15:23:51.432Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 62,
+      "at": "2026-06-08T15:24:01.454Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 85,
+      "at": "2026-06-08T15:24:08.023Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 171,
+      "at": "2026-06-08T15:24:16.079Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 1524,
+      "at": "2026-06-08T15:24:40.170Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 57,
+      "at": "2026-06-08T15:24:51.961Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src/lib/components/ProxyInfo.svelte",
+      "action": "edit",
+      "tokens": 138,
+      "at": "2026-06-08T15:25:05.721Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/tui/mod.rs",
+      "action": "edit",
+      "tokens": 52,
+      "at": "2026-06-08T15:25:25.084Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 371,
+      "at": "2026-06-08T15:25:47.044Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 534,
+      "at": "2026-06-08T15:25:59.555Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 173,
+      "at": "2026-06-08T15:26:47.339Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/proxy.rs",
+      "action": "edit",
+      "tokens": 52,
+      "at": "2026-06-08T15:27:51.654Z"
+    },
+    {
+      "file": "/Users/xiaoleiyu/Repos/agent-hub/src/lib/components/ProxyInfo.svelte",
+      "action": "edit",
+      "tokens": 45,
+      "at": "2026-06-08T15:30:13.844Z"
     }
   ],
   "edit_counts": {
     "src-tauri/src/core_modules/agents/opencode.rs": 3,
-    "src-tauri/src/models/types.rs": 1,
+    "src-tauri/src/models/types.rs": 2,
     "src-tauri/src/core_modules/agents/mod.rs": 5,
     "src-tauri/src/cli/handlers.rs": 1,
     "src-tauri/src/commands/agents.rs": 1,
@@ -806,13 +906,15 @@
     "src/lib/components/SystemStatus.svelte": 5,
     "src/lib/components/NetworkInfo.svelte": 4,
     "src/lib/components/KeepAlive.svelte": 9,
-    "src/lib/components/ProxyInfo.svelte": 16,
+    "src/lib/components/ProxyInfo.svelte": 19,
     "src-tauri/src/core_modules/agents/codex.rs": 1,
-    "src-tauri/src/core_modules/agents/cursor.rs": 1
+    "src-tauri/src/core_modules/agents/cursor.rs": 1,
+    "src-tauri/src/core_modules/proxy.rs": 10,
+    "src-tauri/src/tui/mod.rs": 1
   },
-  "anatomy_hits": 19,
+  "anatomy_hits": 21,
   "anatomy_misses": 0,
-  "repeated_reads_warned": 15,
+  "repeated_reads_warned": 17,
   "cerebrum_warnings": 0,
-  "stop_count": 9
+  "stop_count": 11
 }

@@ -205,6 +205,10 @@ pub struct ProxyClient {
     pub api_port: u16,
     pub version: Option<String>,
     pub mode: Option<String>,
+    /// Unix-domain-socket path for the client's API, when it exposes one instead
+    /// of a TCP port (e.g. Clash Verge Rev's `external-controller-unix`).
+    #[serde(default)]
+    pub api_socket: Option<String>,
 }
 
 /// A proxy node/group from the active client's API
