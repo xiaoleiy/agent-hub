@@ -148,3 +148,14 @@
 | 14:03 | Edited src-tauri/src/cli/handlers.rs | expanded (+11 lines) | ~165 |
 | 14:04 | Added agent login account (email/name/org) detection from local config + display in dashboard Agents column, agent header, and agents CLI | types.rs, agents/{claude,codex,cursor}.rs, tui/mod.rs, cli/handlers.rs, Cargo.toml(base64) | verified all 3: claude essexlg, codex+cursor gmail; 41 tests pass | ~30k |
 | 14:04 | Session end: 28 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 1 reads | ~12375 tok |
+| 14:13 | Session end: 28 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 1 reads | ~12375 tok |
+| 14:20 | Session end: 28 writes across 8 files (claude.rs, handlers.rs, types.rs, codex.rs, mod.rs) | 1 reads | ~12375 tok |
+| 14:38 | Edited src-tauri/src/core_modules/agents/codex.rs | 6→4 lines | ~80 |
+| 14:38 | Edited src-tauri/src/core_modules/agents/codex.rs | modified count_active_sessions() | ~345 |
+| 14:38 | Edited src-tauri/src/core_modules/agents/codex.rs | 5→1 lines | ~14 |
+| 14:38 | Edited src-tauri/src/core_modules/agents/codex.rs | modified test_active_sessions_bounded_by_total() | ~219 |
+| 14:39 | Edited src-tauri/src/tui/mod.rs | modified is_empty() | ~214 |
+| 14:39 | Edited src-tauri/src/tui/mod.rs | modified is_empty() | ~101 |
+| 14:39 | Edited src-tauri/src/cli/handlers.rs | modified is_empty() | ~107 |
+| 14:41 | Edited src-tauri/src/core_modules/agents/cursor.rs | modified fetch_cursor_rate_limits() | ~148 |
+| 14:41 | Fixed Codex session overcount (111->active-in-15min by source; Running(idle) status); gated Cursor rate-limits off by default (no non-Keychain zero-setup path; no local API token) | agents/codex.rs, agents/cursor.rs, tui/mod.rs, cli/handlers.rs | 41 tests pass; Codex shows Running(idle); cursor usage no longer prompts | ~20k |

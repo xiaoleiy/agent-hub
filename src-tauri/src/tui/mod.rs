@@ -673,7 +673,13 @@ fn draw_agents_summary(f: &mut Frame, app: &App, area: Rect) {
                 if a.gui_sessions > 0 {
                     parts.push(format!("{} GUI", a.gui_sessions));
                 }
-                format!("{} ({})", a.active_sessions, parts.join(", "))
+                if a.active_sessions == 0 {
+                    "Running".to_string()
+                } else if parts.is_empty() {
+                    format!("{} active", a.active_sessions)
+                } else {
+                    format!("{} ({})", a.active_sessions, parts.join(", "))
+                }
             } else if a.installed {
                 "Not Opened".to_string()
             } else {
@@ -797,7 +803,13 @@ fn draw_agent_header(f: &mut Frame, agent: &AgentInfo, area: Rect) {
         if agent.gui_sessions > 0 {
             parts.push(format!("{} GUI", agent.gui_sessions));
         }
-        format!("Running — {} active ({})", agent.active_sessions, parts.join(", "))
+        if agent.active_sessions == 0 {
+            "Running — idle".to_string()
+        } else if parts.is_empty() {
+            format!("Running — {} active", agent.active_sessions)
+        } else {
+            format!("Running — {} active ({})", agent.active_sessions, parts.join(", "))
+        }
     } else if agent.installed {
         "Installed — Not Running".to_string()
     } else {

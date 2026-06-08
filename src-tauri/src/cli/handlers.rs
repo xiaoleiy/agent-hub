@@ -139,7 +139,13 @@ pub fn agents(json: bool) {
             if agent.gui_sessions > 0 {
                 parts.push(format!("{} GUI", agent.gui_sessions));
             }
-            format!("{} active ({})", agent.active_sessions, parts.join(", ")).green()
+            if agent.active_sessions == 0 {
+                "Running (idle)".to_string().green()
+            } else if parts.is_empty() {
+                format!("{} active", agent.active_sessions).green()
+            } else {
+                format!("{} active ({})", agent.active_sessions, parts.join(", ")).green()
+            }
         } else if agent.installed {
             "Not Opened".yellow()
         } else {

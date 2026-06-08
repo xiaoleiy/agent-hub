@@ -33,22 +33,16 @@ fn state_db_path() -> PathBuf {
     codex_dir().join("state_5.sqlite")
 }
 
-fn process_manager_path() -> PathBuf {
-    codex_dir().join("process_manager/chat_processes.json")
-}
-
 /// Detect Codex CLI installation and running state
 pub fn detect() -> AgentInfo {
     let codex_bin = PathBuf::from("/opt/homebrew/bin/codex");
     let codex_app = codex_app_path();
     let installed = codex_bin.exists() || codex_dir().exists() || codex_app.is_some();
 
-    // Check live processes
-    let live_processes = get_live_pids();
-    let running = !live_processes.is_empty() || is_codex_running();
-
-    // Count CLI vs GUI sessions from DB
-    let (cli_sessions, gui_sessions) = count_sessions_by_mode();
+    // Active sessions = conversations active in the recent window (not lifetime
+    // threads). running = a codex process is alive, or there's recent activity.
+    let (cli_sessions, gui_sessions) = count_active_sessions();
+    let running = cli_sessions + gui_sessions > 0 || is_codex_running();
 
     let cli_version = get_codex_cli_version();
     let gui_version = get_codex_desktop_version();
@@ -120,39 +114,12 @@ fn is_codex_running() -> bool {
         .unwrap_or(false)
 }
 
-fn get_live_pids() -> Vec<u32> {
-    let path = process_manager_path();
-    if !path.exists() {
-        return vec![];
-    }
-    if let Ok(data) = std::fs::read_to_string(&path) {
-        if let Ok(procs) = serde_json::from_str::<Vec<ProcessEntry>>(&data) {
-            return procs
-                .iter()
-                .filter(|p| is_pid_alive(p.pid))
-                .map(|p| p.pid)
-                .collect();
-        }
-    }
-    vec![]
-}
-
-#[derive(serde::Deserialize)]
-struct ProcessEntry {
-    pid: u32,
-}
-
-fn is_pid_alive(pid: u32) -> bool {
-    std::process::Command::new("kill")
-        .arg("-0")
-        .arg(pid.to_string())
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
-
-/// Count CLI vs GUI sessions from the threads table
-fn count_sessions_by_mode() -> (usize, usize) {
+/// Count active sessions = threads updated within the recent window, split by
+/// source (cli/sdk-cli vs everything else). Previously this counted ALL
+/// non-archived threads (lifetime history), which massively overcounted —
+/// e.g. "111 active (13 CLI, 98 GUI)" for a user with no active session.
+fn count_active_sessions() -> (usize, usize) {
+    const WINDOW_SECS: i64 = 15 * 60;
     let db_path = state_db_path();
     if !db_path.exists() {
         return (0, 0);
@@ -161,23 +128,21 @@ fn count_sessions_by_mode() -> (usize, usize) {
         Ok(c) => c,
         Err(_) => return (0, 0),
     };
+    // updated_at is INTEGER epoch seconds — compare against an integer cutoff.
+    let cutoff = Utc::now().timestamp() - WINDOW_SECS;
     let mut stmt = match conn.prepare(
-        "SELECT source FROM threads WHERE archived = 0",
+        "SELECT source FROM threads WHERE archived = 0 AND updated_at >= ?1",
     ) {
         Ok(s) => s,
         Err(_) => return (0, 0),
     };
     let mut cli = 0usize;
     let mut gui = 0usize;
-    if let Ok(rows) = stmt.query_map([], |row| {
-        let source: String = row.get(0).unwrap_or_default();
-        Ok(source)
-    }) {
-        for row in rows.flatten() {
-            if row == "cli" {
-                cli += 1;
-            } else {
-                gui += 1;
+    if let Ok(rows) = stmt.query_map([cutoff], |row| row.get::<_, String>(0)) {
+        for source in rows.flatten() {
+            match source.as_str() {
+                "cli" | "sdk-cli" => cli += 1,
+                _ => gui += 1,
             }
         }
     }
@@ -659,9 +624,23 @@ mod tests {
     }
 
     #[test]
-    fn test_count_sessions_by_mode() {
-        let (cli, gui) = count_sessions_by_mode();
-        // We know from the system that there are both CLI and GUI sessions
-        assert!(cli + gui > 0, "should have at least some sessions");
+    fn test_active_sessions_bounded_by_total() {
+        // Active (recent-window) sessions must never exceed all non-archived
+        // threads — guards against the old lifetime-count overcount bug.
+        let (cli, gui) = count_active_sessions();
+        let db = state_db_path();
+        if db.exists() {
+            if let Ok(conn) =
+                Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            {
+                if let Ok(total) = conn.query_row(
+                    "SELECT COUNT(*) FROM threads WHERE archived = 0",
+                    [],
+                    |r| r.get::<_, usize>(0),
+                ) {
+                    assert!(cli + gui <= total, "active {} must be <= total {}", cli + gui, total);
+                }
+            }
+        }
     }
 }

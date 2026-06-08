@@ -346,6 +346,15 @@ static CURSOR_RL_CACHE: Mutex<Option<(Instant, Option<RateWindow>, Option<RateWi
     Mutex::new(None);
 
 fn fetch_cursor_rate_limits() -> (Option<RateWindow>, Option<RateWindow>) {
+    // Off by default: the only way to read Cursor's server-side limits is its
+    // browser session cookie, and decrypting Chrome's cookie store triggers a
+    // macOS Keychain prompt. Don't scan browsers / prompt unless explicitly
+    // opted in. Enable with AGENT_HUB_CURSOR_USAGE=1.
+    match std::env::var("AGENT_HUB_CURSOR_USAGE").as_deref() {
+        Ok("1") | Ok("true") => {}
+        _ => return (None, None),
+    }
+
     if let Ok(guard) = CURSOR_RL_CACHE.lock() {
         if let Some((t, s, w)) = guard.as_ref() {
             if t.elapsed() < Duration::from_secs(60) {
