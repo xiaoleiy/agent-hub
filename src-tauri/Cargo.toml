@@ -1,6 +1,6 @@
 [package]
 name = "agent-hub"
-version = "0.2.0"
+version = "0.3.0"
 description = "Manage AI coding agents on your machine"
 authors = ["xiaoleiy"]
 edition = "2021"
