@@ -44,7 +44,7 @@ cask "agent-hub" do
   end
 
   auto_updates false
-  depends_on macos: ">= :catalina"
+  depends_on macos: :catalina
 
   app "Agent Hub.app"
 

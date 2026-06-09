@@ -7,7 +7,18 @@ on:
     tags:
       - "v*"
   release:
-    types: [published]
+    # `published` syncs the tap on first publish; `edited` re-syncs it if the
+    # release assets are later replaced (e.g. a build re-run uploads fresh,
+    # non-reproducible DMGs) so the tap checksums never drift out of sync.
+    types: [published, edited]
+  # Manual re-sync of the tap for an existing release tag — the recovery lever
+  # when assets changed after publish and the tap fell behind.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)sync the tap from, e.g. v0.3.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -85,13 +96,18 @@ jobs:
   # Fires when the drafted release is manually published (not a prerelease).
   # Requires a TAP_GITHUB_TOKEN secret with write access to xiaoleiy/homebrew-tap.
   update-tap:
-    if: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'release' && !github.event.release.prerelease) }}
     runs-on: ubuntu-latest
     steps:
       - name: Resolve version from the published release
         id: ver
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          # On workflow_dispatch use the supplied tag input; on a release event
+          # use the release's own tag. Routed through env (never inlined into
+          # run:) so the user-controlled input cannot inject shell.
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
         run: |
           set -euo pipefail
           VERSION="${TAG#v}"
@@ -112,7 +128,7 @@ jobs:
             --pattern "Agent.Hub_${VERSION}_x64.dmg" \
             --pattern "Agent.Hub_aarch64.app.tar.gz" \
             --pattern "Agent.Hub_x64.app.tar.gz" \
-            --dir dist
+            --dir dist --clobber
           ls -la dist
 
       - name: Compute SHA256 checksums
@@ -174,6 +190,48 @@ jobs:
             { print }
           ' "$F" > "${F}.tmp" && mv "${F}.tmp" "$F"
           cat "$F"
+
+      # Re-download the live assets fresh and assert the hashes we just wrote
+      # into the tap actually appear in the rendered files. Catches the case
+      # where release assets changed between the first download and now (the
+      # exact drift that broke v0.3.0). Fails loudly BEFORE pushing, so a bad
+      # tap is never published — re-run via workflow_dispatch once assets settle.
+      - name: Verify tap checksums match the live release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p verify
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "Agent.Hub_${VERSION}_aarch64.dmg" \
+            --pattern "Agent.Hub_${VERSION}_x64.dmg" \
+            --pattern "Agent.Hub_aarch64.app.tar.gz" \
+            --pattern "Agent.Hub_x64.app.tar.gz" \
+            --dir verify --clobber
+          fail=0
+          check() {
+            local live
+            live=$(sha256sum "verify/$1" | cut -d' ' -f1)
+            if grep -q "$live" "$2"; then
+              echo "OK   $1 -> $live ($2)"
+            else
+              echo "::error::$1 live sha256 ($live) is not present in $2"
+              fail=1
+            fi
+          }
+          check "Agent.Hub_${VERSION}_aarch64.dmg" homebrew-tap/Casks/agent-hub.rb
+          check "Agent.Hub_${VERSION}_x64.dmg"     homebrew-tap/Casks/agent-hub.rb
+          check "Agent.Hub_aarch64.app.tar.gz"     homebrew-tap/Formula/agent-hub-cli.rb
+          check "Agent.Hub_x64.app.tar.gz"         homebrew-tap/Formula/agent-hub-cli.rb
+          if [ "$fail" -ne 0 ]; then
+            echo "Tap checksums do not match the live release assets — the assets"
+            echo "likely changed after build. Re-run this workflow (Actions ->"
+            echo "Release -> Run workflow) with tag $TAG once the release is final."
+            exit 1
+          fi
 
       - name: Commit and push
         working-directory: homebrew-tap
