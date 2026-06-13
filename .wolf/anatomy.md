@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-08T15:30:13.837Z
-> Files: 118 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-13T13:17:29.397Z
+> Files: 125 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../tmp/
 
@@ -164,7 +164,7 @@
 
 - `.gitignore` — Git ignore rules (~45 tok)
 - `build.rs` (~12 tok)
-- `Cargo.toml` — Rust package manifest (~287 tok)
+- `Cargo.toml` — Rust package manifest (~292 tok)
 - `tauri.conf.json` (~372 tok)
 
 ## src-tauri/capabilities/
@@ -214,8 +214,9 @@
 - `claude.rs` — detect, get_sessions, get_usage, get_rich_usage (~6809 tok)
 - `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~6256 tok)
 - `cursor_cookies.rs` — Best-effort extraction of the Cursor session cookie (~2878 tok)
+- `cursor_usage.rs` — Cursor usage + rate limits via the same approach as the `cursor-usage` CLI: (~3647 tok)
 - `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4740 tok)
-- `mod.rs` — Detect all agents and return their info (~404 tok)
+- `mod.rs` — Detect all agents and return their info (~410 tok)
 - `opencode.rs` — OpenCode keeps everything in one SQLite DB under the XDG data dir. (~4306 tok)
 
 ## src-tauri/src/models/

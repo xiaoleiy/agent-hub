@@ -134,7 +134,7 @@
           {@const w = richUsage.session_window}
           <div class="rate-card">
             <div class="rate-header">
-              <span class="rate-label">Session ({formatWindow(w.window_minutes)})</span>
+              <span class="rate-label">{w.label ?? "Session"} ({formatWindow(w.window_minutes)})</span>
               <span class="rate-percent" style="color: {usageBarColor(w.used_percent)}">
                 {w.used_percent.toFixed(1)}% used
               </span>
@@ -154,7 +154,7 @@
           {@const w = richUsage.weekly_window}
           <div class="rate-card">
             <div class="rate-header">
-              <span class="rate-label">Weekly ({formatWindow(w.window_minutes)})</span>
+              <span class="rate-label">{w.label ?? "Weekly"} ({formatWindow(w.window_minutes)})</span>
               <span class="rate-percent" style="color: {usageBarColor(w.used_percent)}">
                 {w.used_percent.toFixed(1)}% used
               </span>

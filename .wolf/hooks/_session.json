@@ -3,8 +3,8 @@
   "started": "2026-06-08T12:43:48.302Z",
   "files_read": {
     "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/core_modules/agents/mod.rs": {
-      "count": 1,
-      "tokens": 345,
+      "count": 2,
+      "tokens": 410,
       "first_read": "2026-06-08T12:44:47.161Z"
     },
     "/Users/xiaoleiyu/Repos/agent-hub/src-tauri/src/models/types.rs": {
@@ -914,7 +914,7 @@
   },
   "anatomy_hits": 21,
   "anatomy_misses": 0,
-  "repeated_reads_warned": 17,
+  "repeated_reads_warned": 18,
   "cerebrum_warnings": 0,
   "stop_count": 11
 }

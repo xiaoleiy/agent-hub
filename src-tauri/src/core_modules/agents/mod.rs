@@ -2,6 +2,7 @@ pub mod claude;
 pub mod codex;
 pub mod cursor;
 pub mod cursor_cookies;
+pub mod cursor_usage;
 pub mod opencode;
 
 use crate::models::types::{AgentInfo, AgentType, AgentUsage, Session, UsageStats};

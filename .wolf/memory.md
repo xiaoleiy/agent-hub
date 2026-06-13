@@ -343,3 +343,9 @@
 | 23:30 | Edited src/lib/components/ProxyInfo.svelte | 3→3 lines | ~42 |
 | 23:57 | Flatten Proxy/VPN sections + fix Clash Verge Rev detection (unix-socket via curl --unix-socket; api_socket field; mode; GUI+TUI display; vv->v) | proxy.rs, types.rs, ProxyInfo.svelte, tui/mod.rs | 50 tests; live: Clash Verge v1.19.25 rule 19 groups; bug-052 | ~16000 |
 | 23:31 | Session end: 130 writes across 18 files (opencode.rs, types.rs, mod.rs, handlers.rs, agents.rs) | 21 reads | ~77962 tok |
+
+## Session: 2026-06-13 18:33
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 18:40 | Integrated cursor-usage approach in Rust | `cursor_usage.rs`, `cursor.rs`, `AgentTab.svelte` | state.vscdb auth + usage APIs; rate limits + 5h tokens without npx/Keychain | ~8k |

@@ -271,11 +271,8 @@ fn window_seconds(window: &str) -> u64 {
     }
 }
 
-/// Get rich usage data for Cursor (API-based, no local JSONL)
+/// Get rich usage data for Cursor via cursor.com APIs (state.vscdb auth).
 pub fn get_rich_usage() -> AgentUsage {
-    // Cursor doesn't have local JSONL files for token data.
-    // Rate limit info would require web API calls with cookies.
-    // Return basic session count from the tracking DB.
     let db_path = tracking_db_path();
     let mut total_sessions = 0usize;
     let mut total_interactions = 0usize;
@@ -284,7 +281,6 @@ pub fn get_rich_usage() -> AgentUsage {
         if let Ok(conn) =
             Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         {
-            // Count distinct conversations
             if let Ok(count) = conn.query_row(
                 "SELECT COUNT(DISTINCT conversationId) FROM conversation_summaries",
                 [],
@@ -292,7 +288,6 @@ pub fn get_rich_usage() -> AgentUsage {
             ) {
                 total_sessions = count;
             }
-            // Count total interactions from ai_code_hashes
             if let Ok(count) = conn.query_row("SELECT COUNT(*) FROM ai_code_hashes", [], |row| {
                 row.get::<_, usize>(0)
             }) {
@@ -301,16 +296,21 @@ pub fn get_rich_usage() -> AgentUsage {
         }
     }
 
-    // Cursor's limits are server-side; fetch them with the browser session
-    // cookie (best-effort, cached). plan -> "Plan" window, on-demand -> "On-Demand".
-    let (session_window, weekly_window) = fetch_cursor_rate_limits();
+    // Primary path: local state.vscdb credentials (same as `cursor-usage` CLI).
+    let api = super::cursor_usage::fetch_snapshot();
+    let (session_window, weekly_window) = if api.session_window.is_some() || api.weekly_window.is_some() {
+        (api.session_window, api.weekly_window)
+    } else {
+        // Legacy fallback: browser session cookie (opt-in — triggers Keychain).
+        fetch_cursor_rate_limits()
+    };
 
     AgentUsage {
         agent: "Cursor".to_string(),
         session_window,
         weekly_window,
-        tokens: None,
-        model_breakdowns: vec![],
+        tokens: api.tokens,
+        model_breakdowns: api.model_breakdowns,
         total_interactions,
         total_sessions,
     }
