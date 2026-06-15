@@ -53,6 +53,13 @@
   font-size: 0.85rem;
 }
 
+:global(.loading-hint) {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
 :global(.empty-state) {
   color: var(--text-dim);
   font-size: 0.85rem;

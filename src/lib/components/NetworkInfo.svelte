@@ -30,7 +30,8 @@
       {/if}
     </div>
   {:else}
-    <p class="loading-state">Loading…</p>
+    <p class="loading-state">Looking up your network…</p>
+    <p class="loading-hint">May take a few seconds on first open.</p>
   {/if}
 </div>
 

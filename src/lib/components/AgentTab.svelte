@@ -5,6 +5,7 @@
 
   let sessions = $state(/** @type {any[]} */ ([]));
   let richUsage = $state(/** @type {any} */ (null));
+  let loading = $state(true);
 
   // Client-side pagination for the session list (10 per page).
   const PAGE_SIZE = 10;
@@ -18,8 +19,9 @@
     if (page > pageCount - 1) page = pageCount - 1;
   });
 
-  async function fetchData() {
+  async function fetchData(/** @type {boolean} */ skipLoadingOverlay = false) {
     const name = agent.name === "Claude Code" ? "claude" : agent.name.toLowerCase();
+    if (!skipLoadingOverlay) loading = true;
     try {
       sessions = await invoke("get_agent_sessions", { agent: name });
     } catch (_) {
@@ -29,6 +31,8 @@
       richUsage = await invoke("get_agent_rich_usage", { agent: name });
     } catch (_) {
       richUsage = null;
+    } finally {
+      loading = false;
     }
   }
 
@@ -40,22 +44,16 @@
   $effect(() => {
     const _ = agent.name; // stable identity dependency only
     page = 0; // reset pagination when switching agents
-    fetchData();
+    fetchData(false);
   });
 
   // Keep this tab's own sessions/usage live with a modest, decoupled interval
   // so data still refreshes without coupling to the parent's object churn.
   $effect(() => {
-    const id = setInterval(fetchData, 5000);
+    const id = setInterval(() => fetchData(true), 5000);
     return () => clearInterval(id);
   });
 
-  /** Show the tail of a path (most informative part) for narrow rows. */
-  function shortDir(/** @type {string} */ p) {
-    if (!p) return "";
-    const max = 38;
-    return p.length > max ? "…" + p.slice(p.length - max) : p;
-  }
 
   /** @param {string} isoString */
   function relativeTime(isoString) {
@@ -142,7 +140,8 @@
 
   /** @param {any} w */
   function quotaBarWidth(w) {
-    return Math.min(w.used_percent, 100);
+    const pct = w.is_remaining ? w.used_percent : 100 - w.used_percent;
+    return Math.min(pct, 100);
   }
 
   /** @param {any} w */
@@ -190,6 +189,15 @@
     </div>
   </div>
 
+  {#if loading}
+    <section class="section-card loading-panel">
+      <p class="loading-state">Loading {agent.name}…</p>
+      <p class="loading-hint">
+        Fetching rate limits and active sessions. This may take a few seconds on first
+        open.
+      </p>
+    </section>
+  {:else}
   <!-- Rate Limit Windows -->
   {#if rateLayout.total || rateLayout.breakdown.length > 0 || rateLayout.flat.length > 0}
     <section class="section-card rate-limits">
@@ -358,13 +366,15 @@
       <div class="session-list">
         {#each pagedSessions as sess}
           <div class="session-item">
-            <div class="session-top">
+            <div class="session-id-row">
               <span
                 class="s-dot"
                 class:busy={sess.status === "busy"}
                 title={sess.status}
               ></span>
               <span class="s-id" title={sess.id}>{sess.id}</span>
+            </div>
+            <div class="session-meta">
               <span
                 class="s-mode"
                 class:gui={sess.entrypoint !== "cli" && sess.entrypoint !== "sdk-cli"}
@@ -374,7 +384,7 @@
               <span class="s-time">{relativeTime(sess.started_at)}</span>
             </div>
             <div class="session-dir" title={sess.working_dir || ""}>
-              {#if sess.working_dir}{shortDir(sess.working_dir)}{:else}<span class="dim">no working dir</span>{/if}
+              {#if sess.working_dir}{sess.working_dir}{:else}<span class="dim">no working dir</span>{/if}
             </div>
           </div>
         {/each}
@@ -398,6 +408,7 @@
       {/if}
     {/if}
   </section>
+  {/if}
 </div>
 
 <style>
@@ -708,10 +719,29 @@
   .session-item:first-child { padding-top: 1px; }
   .session-item:last-child { border-bottom: none; padding-bottom: 1px; }
 
-  .session-top {
+  .session-id-row {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+  }
+
+  .session-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    margin-left: 15px;
+  }
+
+  .s-id {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow-x: auto;
   }
 
   .s-dot {
@@ -722,17 +752,6 @@
     flex-shrink: 0;
   }
   .s-dot.busy { background: var(--danger); }
-
-  .s-id {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.78rem;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 
   .s-mode {
     flex-shrink: 0;

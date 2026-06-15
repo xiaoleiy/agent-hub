@@ -1,7 +1,7 @@
 use crate::core_modules::{agents, keepalive, network, proxy, system};
 use crate::models::types::{
-    AgentInfo, AgentUsage, KeepAliveStatus, NetworkInfo, ProxyInfo, RateWindow, Session,
-    SystemStatus, UsageStats,
+    AgentInfo, AgentType, AgentUsage, KeepAliveStatus, NetworkInfo, ProxyInfo, RateWindow,
+    Session, SystemStatus, UsageStats,
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
@@ -13,7 +13,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Bar, BarChart, BarGroup, Block, Borders, Cell, Gauge, Paragraph, Row, Table, Tabs},
+    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table, Tabs},
     Frame, Terminal,
 };
 use std::io;
@@ -23,6 +23,12 @@ const MIN_DASHBOARD_WIDTH_FOR_SIDE_BY_SIDE_AGENTS: u16 = 140;
 const AGENT_DETAIL_REFRESH: Duration = Duration::from_secs(60);
 const PROXY_REFRESH: Duration = Duration::from_secs(30);
 const DASHBOARD_QUOTA_REFRESH: Duration = Duration::from_secs(60);
+
+/// One rate-limit row on the Dashboard quota panel (agent + window).
+struct DashboardQuotaRow {
+    label: String,
+    window: RateWindow,
+}
 
 struct DashboardLayout {
     system: Rect,
@@ -39,9 +45,13 @@ struct App {
     agent_sessions: Vec<Vec<Session>>,
     /// 5h activity per agent (legacy; kept for future use)
     agent_usage_5h: Vec<UsageStats>,
-    /// Quota remaining % per agent — drives the Dashboard comparison chart
-    dashboard_quota_remaining: Vec<f64>,
+    /// Per-window quota rows for the Dashboard (5h + 1w per agent; Cursor excluded).
+    dashboard_quota_rows: Vec<DashboardQuotaRow>,
     dashboard_quota_refreshed_at: Option<Instant>,
+    /// True until the first quota fetch completes (shows a loading message).
+    dashboard_quota_loading: bool,
+    /// True until the first external-IP lookup completes.
+    network_loading: bool,
     /// Rich usage per agent (lazy: None until the agent tab is viewed)
     agent_rich_usage: Vec<Option<AgentUsage>>,
     /// Proxy/VPN info (lazy: None until the Proxy tab is viewed — probing is slow)
@@ -73,8 +83,10 @@ impl App {
             agents: Vec::new(),
             agent_sessions: Vec::new(),
             agent_usage_5h: Vec::new(),
-            dashboard_quota_remaining: Vec::new(),
+            dashboard_quota_rows: Vec::new(),
             dashboard_quota_refreshed_at: None,
+            dashboard_quota_loading: true,
+            network_loading: true,
             agent_rich_usage: Vec::new(),
             proxy: None,
             keepalive: keepalive::get_keepalive_status(),
@@ -85,9 +97,9 @@ impl App {
             agent_detail_refreshed_at: Vec::new(),
             proxy_refreshed_at: None,
         };
-        // Startup only loads what the Dashboard (initial tab) needs. Proxy probing
-        // and per-agent detail are loaded lazily when those tabs are first viewed.
-        app.refresh_dashboard();
+        // Fast path only — paint the Dashboard immediately; slow fetches run after
+        // the first frame (see `process_pending_tab_loads` in the event loop).
+        app.refresh_dashboard_fast();
         app
     }
 
@@ -150,7 +162,6 @@ impl App {
         self.agent_rich_usage.resize(n, None);
         self.agent_detail_loaded.resize(n, false);
         self.agent_detail_refreshed_at.resize(n, None);
-        self.dashboard_quota_remaining.resize(n, 0.0);
     }
 
     fn agent_detail_needs_refresh(&self, idx: usize) -> bool {
@@ -170,12 +181,14 @@ impl App {
         }
     }
 
-    /// Load the data the Dashboard shows. Cheap enough to run on every tick.
-    fn refresh_dashboard(&mut self) {
+    /// Load cheap Dashboard fields (agent list). Safe on every tick.
+    fn refresh_dashboard_fast(&mut self) {
         self.agents = agents::detect_all_agents();
         self.resize_agent_buffers();
+    }
 
-        // External IP is fetched once — it doesn't change between ticks.
+    /// Slow Dashboard work: external IP lookup + per-agent quota APIs.
+    fn refresh_dashboard_slow(&mut self) {
         if !self.network_loaded {
             if let Ok(rt) = tokio::runtime::Runtime::new() {
                 if let Ok(info) = rt.block_on(network::get_network_info()) {
@@ -183,6 +196,24 @@ impl App {
                     self.network_loaded = true;
                 }
             }
+            self.network_loading = false;
+        }
+
+        let quota_stale = self
+            .dashboard_quota_refreshed_at
+            .map(|t| t.elapsed() >= DASHBOARD_QUOTA_REFRESH)
+            .unwrap_or(true);
+        if quota_stale {
+            self.dashboard_quota_rows = self
+                .agents
+                .iter()
+                .filter(|a| a.installed && !matches!(a.agent_type, AgentType::Cursor))
+                .flat_map(|a| {
+                    dashboard_quota_rows_for_agent(&a.name, &agents::get_rich_usage(&a.agent_type))
+                })
+                .collect();
+            self.dashboard_quota_refreshed_at = Some(Instant::now());
+            self.dashboard_quota_loading = false;
         }
 
         // 5h activity counts (legacy).
@@ -191,18 +222,25 @@ impl App {
             .iter()
             .map(|a| agents::get_usage(&a.agent_type, "5h"))
             .collect();
+    }
 
-        let quota_stale = self
-            .dashboard_quota_refreshed_at
-            .map(|t| t.elapsed() >= DASHBOARD_QUOTA_REFRESH)
-            .unwrap_or(true);
-        if quota_stale {
-            self.dashboard_quota_remaining = self
-                .agents
-                .iter()
-                .map(|a| primary_quota_remaining(&agents::get_rich_usage(&a.agent_type)))
-                .collect();
-            self.dashboard_quota_refreshed_at = Some(Instant::now());
+    /// After the UI is painted, load heavy data for the active tab if needed.
+    /// Returns true when the caller should redraw immediately.
+    fn process_pending_tab_loads(&mut self) -> bool {
+        match self.active_tab_kind() {
+            TabKind::Dashboard if self.dashboard_quota_loading || self.network_loading => {
+                self.refresh_dashboard_slow();
+                true
+            }
+            TabKind::Agent(idx) if !self.agent_detail_loaded.get(idx).copied().unwrap_or(false) => {
+                self.refresh_agent_detail(idx);
+                true
+            }
+            TabKind::Proxy if self.proxy.is_none() => {
+                self.refresh_proxy();
+                true
+            }
+            _ => false,
         }
     }
 
@@ -234,13 +272,8 @@ impl App {
 
     /// Lazily load the active tab's data on first view (cheap if already loaded).
     fn ensure_active_tab_loaded(&mut self) {
-        match self.active_tab_kind() {
-            TabKind::Proxy if self.proxy.is_none() => self.refresh_proxy(),
-            TabKind::Agent(idx) if !self.agent_detail_loaded.get(idx).copied().unwrap_or(false) => {
-                self.refresh_agent_detail(idx);
-            }
-            _ => {}
-        }
+        // Heavy loads run after paint via `process_pending_tab_loads` so the UI
+        // can show a loading message instead of blocking startup.
     }
 
     /// Periodic refresh: live system stats plus only the active tab's data (throttled).
@@ -248,7 +281,16 @@ impl App {
         self.system = system::get_system_status();
         self.keepalive = keepalive::get_keepalive_status();
         match self.active_tab_kind() {
-            TabKind::Dashboard => self.refresh_dashboard(),
+            TabKind::Dashboard => {
+                self.refresh_dashboard_fast();
+                let quota_stale = self
+                    .dashboard_quota_refreshed_at
+                    .map(|t| t.elapsed() >= DASHBOARD_QUOTA_REFRESH)
+                    .unwrap_or(true);
+                if quota_stale && !self.dashboard_quota_loading {
+                    self.refresh_dashboard_slow();
+                }
+            }
             TabKind::Proxy if self.proxy_needs_refresh() => self.refresh_proxy(),
             TabKind::Agent(idx) if self.agent_detail_needs_refresh(idx) => {
                 self.refresh_agent_detail(idx);
@@ -326,6 +368,10 @@ pub fn run_tui() {
         // Lazily load the active tab's data before drawing (one-time per tab).
         app.ensure_active_tab_loaded();
         terminal.draw(|f| draw(f, &mut app)).unwrap();
+
+        if app.process_pending_tab_loads() {
+            continue;
+        }
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
@@ -482,9 +528,24 @@ fn draw(f: &mut Frame, app: &mut App) {
                 .iter()
                 .position(|a| a.agent_type == agent.agent_type)
             {
-                let sessions = app.agent_sessions.get(all_idx).cloned().unwrap_or_default();
-                let rich = app.agent_rich_usage.get(all_idx).cloned().flatten();
-                draw_agent_tab(f, agent, &sessions, rich.as_ref(), chunks[1]);
+                if !app
+                    .agent_detail_loaded
+                    .get(all_idx)
+                    .copied()
+                    .unwrap_or(false)
+                {
+                    draw_panel_loading(
+                        f,
+                        chunks[1],
+                        &format!(" {} ", agent.name),
+                        "Loading agent data…",
+                        "Fetching rate limits and active sessions. This may take a few seconds.",
+                    );
+                } else {
+                    let sessions = app.agent_sessions.get(all_idx).cloned().unwrap_or_default();
+                    let rich = app.agent_rich_usage.get(all_idx).cloned().flatten();
+                    draw_agent_tab(f, agent, &sessions, rich.as_ref(), chunks[1]);
+                }
             }
         }
     }
@@ -506,15 +567,39 @@ fn draw(f: &mut Frame, app: &mut App) {
 
 /// Placeholder shown while a lazily-loaded tab's data is being fetched.
 fn draw_loading(f: &mut Frame, area: Rect, title: &str) {
+    draw_panel_loading(
+        f,
+        area,
+        title,
+        "Loading…",
+        "This may take a few seconds on first open.",
+    );
+}
+
+fn draw_panel_loading(
+    f: &mut Frame,
+    area: Rect,
+    title: &str,
+    headline: &str,
+    detail: &str,
+) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title.to_string());
     let inner = block.inner(area);
     f.render_widget(block, area);
-    f.render_widget(
-        Paragraph::new(" Loading…").style(Style::default().fg(Color::DarkGray)),
-        inner,
-    );
+    let lines = vec![
+        Line::from(Span::styled(
+            format!(" {headline}"),
+            Style::default().fg(Color::White),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            format!(" {detail}"),
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    f.render_widget(Paragraph::new(lines), inner);
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -694,9 +779,21 @@ fn draw_network(f: &mut Frame, app: &App, area: Rect) {
                 Span::styled(&info.timezone, Style::default().fg(Color::White)),
             ]),
         ]
+    } else if app.network_loading {
+        vec![
+            Line::from(Span::styled(
+                " Looking up your network…",
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                " May take a few seconds on first open.",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ]
     } else {
         vec![Line::from(Span::styled(
-            " Loading...",
+            " Network info unavailable",
             Style::default().fg(Color::DarkGray),
         ))]
     };
@@ -1250,10 +1347,14 @@ fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], a
         return;
     }
 
-    // Responsive Session-ID column: grow with the panel, up to a full UUID (36).
-    // 30 ≈ mode(8) + status(10) + time(8) + 4 inter-column gaps.
-    let flexible = inner.width.saturating_sub(30);
-    let id_w = flexible.saturating_sub(16).clamp(14, 38);
+    // Session ID gets all flexible width; working dir is secondary.
+    let widths = [
+        Constraint::Min(36),  // Session (widest — full IDs)
+        Constraint::Length(7), // Mode
+        Constraint::Length(8), // Status
+        Constraint::Min(10),   // Working Dir
+        Constraint::Length(8), // Time
+    ];
 
     let rows: Vec<Row> = sessions
         .iter()
@@ -1275,11 +1376,11 @@ fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], a
                 _ => Style::default().fg(Color::DarkGray),
             };
 
-            // Truncate session ID from the front to show the unique suffix
+            // Full session ID — column is given the widest flexible width.
             let sid = if s.id.is_empty() {
                 "—".to_string()
             } else {
-                truncate_id(&s.id, id_w as usize)
+                s.id.clone()
             };
 
             // Working dir: show tail with more space
@@ -1312,15 +1413,6 @@ fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], a
         })
         .collect();
 
-    // Responsive widths: session ID fixed, mode+status compact, working dir gets the bulk
-    let widths = [
-        Constraint::Length(id_w), // Session ID (responsive)
-        Constraint::Length(8),    // Mode
-        Constraint::Length(10),   // Status
-        Constraint::Min(16),      // Working Dir (flexible, gets remaining space)
-        Constraint::Length(8),    // Time
-    ];
-
     let table = Table::new(rows, widths).header(
         Row::new(vec!["Session", "Mode", "Status", "Working Dir", "Time"]).style(
             Style::default()
@@ -1341,52 +1433,93 @@ fn draw_usage_mini(f: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    if app.agents.is_empty() {
-        let p = Paragraph::new("No agents").style(Style::default().fg(Color::DarkGray));
+    if app.dashboard_quota_loading {
+        let lines = vec![
+            Line::from(Span::styled(
+                " Fetching agent quotas…",
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                " Contacting each agent for 5h and weekly limits.",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(Span::styled(
+                " May take a few seconds on first open.",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+        f.render_widget(Paragraph::new(lines), inner);
+        return;
+    }
+
+    if app.dashboard_quota_rows.is_empty() {
+        let p = Paragraph::new("No quota data").style(Style::default().fg(Color::DarkGray));
         f.render_widget(p, inner);
         return;
     }
 
-    let bars: Vec<Bar> = app
-        .agents
+    let label_w = 14usize;
+    let bar_w = inner.width.saturating_sub(label_w as u16 + 6).max(8) as usize;
+    let lines: Vec<Line> = app
+        .dashboard_quota_rows
         .iter()
-        .enumerate()
-        .map(|(i, a)| {
-            let color = match i % 3 {
-                0 => Color::Cyan,
-                1 => Color::Green,
-                _ => Color::Yellow,
+        .map(|row| {
+            let color = quota_stress_color(&row.window);
+            let rem = row.window.remaining_percent();
+            let bar_pct = if row.window.is_remaining {
+                row.window.used_percent
+            } else {
+                rem
             };
-            let remaining = app
-                .dashboard_quota_remaining
-                .get(i)
-                .copied()
-                .unwrap_or(0.0)
-                .round()
-                .clamp(0.0, 100.0) as u64;
-            Bar::default()
-                .label(Line::from(a.name.chars().take(8).collect::<String>()))
-                .value(remaining as u64)
-                .style(Style::default().fg(color))
+            Line::from(vec![
+                Span::styled(
+                    format!(" {:<width$}", row.label, width = label_w),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled(format_bar(bar_pct, bar_w), Style::default().fg(color)),
+                Span::styled(
+                    format!(" {:.0}%", rem),
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                ),
+            ])
         })
         .collect();
 
-    let barchart = BarChart::default()
-        .block(Block::default())
-        .data(BarGroup::default().bars(&bars))
-        .bar_width(9)
-        .bar_gap(1);
-    f.render_widget(barchart, inner);
+    let p = Paragraph::new(lines);
+    f.render_widget(p, inner);
 }
 
-/// Primary rate-limit window as remaining % for cross-agent dashboard comparison.
-fn primary_quota_remaining(usage: &AgentUsage) -> f64 {
-    usage
-        .session_window
-        .as_ref()
-        .or(usage.weekly_window.as_ref())
-        .map(|w| w.remaining_percent())
-        .unwrap_or(0.0)
+/// Build dashboard quota rows (5h session + weekly) for non-Cursor agents.
+fn dashboard_quota_rows_for_agent(name: &str, usage: &AgentUsage) -> Vec<DashboardQuotaRow> {
+    // Cursor uses monthly hierarchy — excluded from the 5h/1w dashboard panel.
+    if usage.cursor_rate_hierarchy().is_some() {
+        return Vec::new();
+    }
+
+    let short_name: String = name.chars().take(10).collect();
+    let mut rows = Vec::new();
+
+    if let Some(w) = &usage.session_window {
+        // Skip Cursor-style monthly "Total" windows.
+        if w.window_minutes < 43_200 && w.label.as_deref() != Some("Total") {
+            let tag = window_label(w.window_minutes);
+            rows.push(DashboardQuotaRow {
+                label: format!("{short_name} {tag}"),
+                window: w.clone(),
+            });
+        }
+    }
+
+    if let Some(w) = &usage.weekly_window {
+        let tag = window_label(w.window_minutes);
+        rows.push(DashboardQuotaRow {
+            label: format!("{short_name} {tag}"),
+            window: w.clone(),
+        });
+    }
+
+    rows
 }
 
 // ─── Proxy / VPN ─────────────────────────────────────────────────────────────
@@ -1802,18 +1935,6 @@ fn draw_keepalive(f: &mut Frame, app: &App, area: Rect) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/// Truncate a session ID to `max_len` chars, keeping the right (unique) part
-fn truncate_id(id: &str, max_len: usize) -> String {
-    let char_count = id.chars().count();
-    if char_count <= max_len {
-        id.to_string()
-    } else {
-        let skip = char_count - max_len + 1; // +1 for the '…' prefix
-        let tail: String = id.chars().skip(skip).collect();
-        format!("…{}", tail)
-    }
-}
-
 /// Shorten a path by replacing the middle with …, keeping the tail.
 /// Uses char-based operations to avoid panicking on multi-byte UTF-8.
 fn shorten_path(path: &str) -> String {
@@ -1897,23 +2018,57 @@ mod tests {
     }
 
     #[test]
-    fn truncate_id_short_ids_unchanged() {
-        assert_eq!(truncate_id("abc", 10), "abc");
-        assert_eq!(truncate_id("1234567890", 10), "1234567890");
-    }
+    fn dashboard_quota_rows_skip_cursor_monthly_and_include_5h_weekly() {
+        let usage = AgentUsage {
+            agent: "codex".into(),
+            session_window: Some(RateWindow {
+                used_percent: 98.0,
+                window_minutes: 300,
+                resets_at: None,
+                label: None,
+                is_remaining: true,
+            }),
+            weekly_window: Some(RateWindow {
+                used_percent: 65.0,
+                window_minutes: 10_080,
+                resets_at: None,
+                label: None,
+                is_remaining: true,
+            }),
+            extra_rate_windows: vec![],
+            tokens: None,
+            model_breakdowns: vec![],
+            total_interactions: 0,
+            total_sessions: 0,
+        };
+        let rows = dashboard_quota_rows_for_agent("Codex", &usage);
+        assert_eq!(rows.len(), 2);
+        assert!(rows[0].label.contains("5h"));
+        assert!(rows[1].label.contains("1w"));
 
-    #[test]
-    fn truncate_id_long_ids_keep_right() {
-        let result = truncate_id("abcdefghijklmnop", 8);
-        assert!(result.starts_with("…"));
-        // Use chars().count() since '…' is multi-byte UTF-8
-        assert!(
-            result.chars().count() <= 8,
-            "expected <= 8 chars, got {}: {}",
-            result.chars().count(),
-            result
-        );
-        assert!(result.ends_with("mnop"));
+        let cursor = AgentUsage {
+            agent: "cursor".into(),
+            session_window: Some(RateWindow {
+                used_percent: 40.0,
+                window_minutes: 43_200,
+                resets_at: None,
+                label: Some("Total".into()),
+                is_remaining: true,
+            }),
+            weekly_window: Some(RateWindow {
+                used_percent: 80.0,
+                window_minutes: 43_200,
+                resets_at: None,
+                label: Some("API".into()),
+                is_remaining: true,
+            }),
+            extra_rate_windows: vec![],
+            tokens: None,
+            model_breakdowns: vec![],
+            total_interactions: 0,
+            total_sessions: 0,
+        };
+        assert!(dashboard_quota_rows_for_agent("Cursor", &cursor).is_empty());
     }
 
     #[test]

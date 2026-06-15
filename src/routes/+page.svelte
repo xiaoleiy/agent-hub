@@ -13,6 +13,7 @@
   let agents = $state(/** @type {any[]} */ ([]));
   let keepAliveStatus = $state(null);
   let activeTab = $state(0);
+  let agentsLoading = $state(true);
 
   /** @type {ReturnType<typeof setInterval> | undefined} */
   let pollInterval;
@@ -54,6 +55,8 @@
       }
     } catch (e) {
       console.error("Failed to fetch agents:", e);
+    } finally {
+      agentsLoading = false;
     }
   }
 
@@ -123,7 +126,14 @@
   </div>
 
   <!-- Tabs -->
-  {#if tabs().length > 0}
+  {#if agentsLoading && availableAgents.length === 0}
+    <section class="card tabs-section">
+      <div class="tab-content bootstrap-loading">
+        <p class="loading-state">Starting Agent Hub…</p>
+        <p class="loading-hint">Detecting installed agents on your Mac. This may take a moment.</p>
+      </div>
+    </section>
+  {:else if tabs().length > 0}
     <section class="card tabs-section">
       <div class="tab-bar">
         {#each tabs() as tab, i}
@@ -416,5 +426,9 @@
   .tab-content {
     min-height: 80px;
     contain: layout style;
+  }
+
+  .bootstrap-loading {
+    padding: 12px 4px 8px;
   }
 </style>
