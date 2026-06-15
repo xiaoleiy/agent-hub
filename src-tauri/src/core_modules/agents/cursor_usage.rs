@@ -30,17 +30,11 @@ struct UsageSummary {
     billing_cycle_end: Option<serde_json::Value>,
     #[serde(rename = "individualUsage")]
     individual_usage: Option<IndividualUsage>,
-    #[serde(rename = "autoModelSelectedDisplayMessage")]
-    auto_model_message: Option<String>,
-    #[serde(rename = "namedModelSelectedDisplayMessage")]
-    named_model_message: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct IndividualUsage {
     plan: Option<UsageBlock>,
-    #[serde(rename = "onDemand")]
-    on_demand: Option<OnDemandBlock>,
 }
 
 #[derive(Deserialize)]
@@ -49,15 +43,10 @@ struct UsageBlock {
     limit: Option<i64>,
     #[serde(rename = "totalPercentUsed")]
     total_percent_used: Option<f64>,
-}
-
-#[derive(Deserialize)]
-struct OnDemandBlock {
-    used: Option<i64>,
-    limit: Option<i64>,
-    #[serde(rename = "totalPercentUsed")]
-    total_percent_used: Option<f64>,
-    enabled: Option<bool>,
+    #[serde(rename = "apiPercentUsed")]
+    api_percent_used: Option<f64>,
+    #[serde(rename = "autoPercentUsed")]
+    auto_percent_used: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -89,6 +78,7 @@ struct TokenUsageBlock {
 pub struct CursorUsageSnapshot {
     pub session_window: Option<RateWindow>,
     pub weekly_window: Option<RateWindow>,
+    pub extra_rate_windows: Vec<RateWindow>,
     pub tokens: Option<TokenUsage>,
     pub model_breakdowns: Vec<ModelUsage>,
 }
@@ -253,15 +243,16 @@ fn fetch_usage_events(creds: &CursorCredentials, start: DateTime<Utc>, end: Date
     })
 }
 
-fn percent_from_message(msg: &str) -> Option<f64> {
-    // "You've used 15% of your included total usage"
-    let start = msg.find("used ")? + 5;
-    let rest = &msg[start..];
-    let end = rest.find('%')?;
-    rest[..end].trim().parse().ok()
+fn percent_from_block(block: &UsageBlock, field: Option<f64>) -> Option<f64> {
+    field.or_else(|| match (block.used, block.limit) {
+        (Some(u), Some(l)) if l > 0 => Some(u as f64 / l as f64 * 100.0),
+        _ => None,
+    })
 }
 
-fn rate_windows_from_summary(summary: &UsageSummary) -> (Option<RateWindow>, Option<RateWindow>) {
+fn rate_windows_from_summary(
+    summary: &UsageSummary,
+) -> (Option<RateWindow>, Option<RateWindow>, Vec<RateWindow>) {
     let resets = summary
         .billing_cycle_end
         .as_ref()
@@ -270,71 +261,31 @@ fn rate_windows_from_summary(summary: &UsageSummary) -> (Option<RateWindow>, Opt
 
     let individual = match summary.individual_usage.as_ref() {
         Some(i) => i,
-        None => return (None, None),
+        None => return (None, None, vec![]),
     };
 
-    let mk_plan = |block: &UsageBlock, label: &str| -> Option<RateWindow> {
-        let pct = block.total_percent_used.or_else(|| match (block.used, block.limit) {
-            (Some(u), Some(l)) if l > 0 => Some(u as f64 / l as f64 * 100.0),
-            _ => None,
-        })?;
-        Some(RateWindow {
-            used_percent: pct,
-            window_minutes: MONTH_MINUTES,
-            resets_at: resets.clone(),
-            label: Some(label.to_string()),
-        })
+    let plan = match individual.plan.as_ref() {
+        Some(p) => p,
+        None => return (None, None, vec![]),
     };
 
-    let plan = individual
-        .plan
-        .as_ref()
-        .and_then(|b| mk_plan(b, "Plan"));
+    let mk = |pct: f64, label: &str| RateWindow {
+        used_percent: pct,
+        window_minutes: MONTH_MINUTES,
+        resets_at: resets.clone(),
+        label: Some(label.to_string()),
+        is_remaining: false,
+    };
 
-    let on_demand = individual.on_demand.as_ref().and_then(|b| {
-        if b.enabled == Some(false) {
-            return None;
-        }
-        let pct = b.total_percent_used.or_else(|| match (b.used, b.limit) {
-            (Some(u), Some(l)) if l > 0 => Some(u as f64 / l as f64 * 100.0),
-            _ => None,
-        })?;
-        Some(RateWindow {
-            used_percent: pct,
-            window_minutes: MONTH_MINUTES,
-            resets_at: resets.clone(),
-            label: Some("On-Demand".to_string()),
-        })
-    });
+    let total = percent_from_block(plan, plan.total_percent_used).map(|pct| mk(pct, "Total"));
+    let api = plan.api_percent_used.map(|pct| mk(pct, "API"));
+    let auto = plan
+        .auto_percent_used
+        .map(|pct| mk(pct, "Auto+Composer"));
 
-    // Prefer the auto/named model messages when present — they track the
-    // rolling session-style limits Cursor shows in the app.
-    let auto_session = summary
-        .auto_model_message
-        .as_deref()
-        .and_then(percent_from_message)
-        .map(|pct| RateWindow {
-            used_percent: pct,
-            window_minutes: 5 * 60,
-            resets_at: resets.clone(),
-            label: Some("Auto".to_string()),
-        });
+    let extra = auto.into_iter().collect();
 
-    let named_weekly = summary
-        .named_model_message
-        .as_deref()
-        .and_then(percent_from_message)
-        .map(|pct| RateWindow {
-            used_percent: pct,
-            window_minutes: 7 * 24 * 60,
-            resets_at: resets.clone(),
-            label: Some("Named".to_string()),
-        });
-
-    (
-        auto_session.or(plan),
-        named_weekly.or(on_demand),
-    )
+    (total, api, extra)
 }
 
 fn aggregate_events(events: &[UsageEvent]) -> (Option<TokenUsage>, Vec<ModelUsage>) {
@@ -415,19 +366,20 @@ fn fetch_snapshot_uncached() -> CursorUsageSnapshot {
     };
 
     let summary = fetch_usage_summary(&creds);
-    let (session_window, weekly_window) = summary
+    let (session_window, weekly_window, extra_rate_windows) = summary
         .as_ref()
         .map(rate_windows_from_summary)
-        .unwrap_or((None, None));
+        .unwrap_or((None, None, vec![]));
 
     let end = Utc::now();
-    let start = end - chrono::Duration::hours(5);
+    let start = end - chrono::Duration::days(30);
     let events = fetch_usage_events(&creds, start, end);
     let (tokens, model_breakdowns) = aggregate_events(&events);
 
     CursorUsageSnapshot {
         session_window,
         weekly_window,
+        extra_rate_windows,
         tokens,
         model_breakdowns,
     }
@@ -455,9 +407,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn percent_from_message_parses_cursor_copy() {
-        let pct = percent_from_message("You've used 15% of your included total usage");
-        assert_eq!(pct, Some(15.0));
+    fn rate_windows_use_monthly_total_and_api() {
+        let summary = UsageSummary {
+            billing_cycle_end: Some(serde_json::json!("2026-07-11T02:44:30.000Z")),
+            individual_usage: Some(IndividualUsage {
+                plan: Some(UsageBlock {
+                    used: Some(50),
+                    limit: Some(100),
+                    total_percent_used: Some(42.5),
+                    api_percent_used: Some(18.0),
+                    auto_percent_used: Some(82.64),
+                }),
+            }),
+        };
+        let (total, api, extra) = rate_windows_from_summary(&summary);
+        let total = total.expect("total window");
+        let api = api.expect("api window");
+        let auto = extra.into_iter().next().expect("auto window");
+        assert_eq!(total.label.as_deref(), Some("Total"));
+        assert_eq!(total.used_percent, 42.5);
+        assert_eq!(total.window_minutes, 30 * 24 * 60);
+        assert_eq!(total.resets_at.as_deref(), Some("2026-07-11T02:44:30.000Z"));
+        assert_eq!(api.label.as_deref(), Some("API"));
+        assert_eq!(api.used_percent, 18.0);
+        assert_eq!(auto.label.as_deref(), Some("Auto+Composer"));
+        assert_eq!(auto.used_percent, 82.64);
+        assert_eq!(auto.window_minutes, 30 * 24 * 60);
     }
 
     #[test]

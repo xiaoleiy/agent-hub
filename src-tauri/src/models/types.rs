@@ -106,6 +106,9 @@ pub struct AgentUsage {
     pub session_window: Option<RateWindow>,
     /// Weekly rate limit window
     pub weekly_window: Option<RateWindow>,
+    /// Additional rate-limit windows (e.g. Cursor Auto+Composer)
+    #[serde(default)]
+    pub extra_rate_windows: Vec<RateWindow>,
     /// Token breakdown from local JSONL parsing
     pub tokens: Option<TokenUsage>,
     /// Per-model token breakdown
@@ -119,7 +122,10 @@ pub struct AgentUsage {
 /// A rate-limit window (like codexbar's RateWindow)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RateWindow {
-    /// Percent used (0-100)
+    /// Quota percent for this window (0-100). Meaning depends on
+    /// [`is_remaining`](Self::is_remaining): consumed usage when false, headroom
+    /// left when true. Codex OAuth reports consumed in `used_percent` and we
+    /// store `100 - used` with `is_remaining = true`.
     pub used_percent: f64,
     /// Window duration in minutes (e.g. 300 for 5h, 10080 for weekly)
     pub window_minutes: u64,
@@ -129,6 +135,65 @@ pub struct RateWindow {
     /// derives a label from window_minutes (Session / Weekly).
     #[serde(default)]
     pub label: Option<String>,
+    /// When true, [`used_percent`](Self::used_percent) is remaining quota (Codex).
+    #[serde(default)]
+    pub is_remaining: bool,
+}
+
+impl RateWindow {
+    /// Headroom left in this window (0-100), regardless of storage semantics.
+    pub fn remaining_percent(&self) -> f64 {
+        if self.is_remaining {
+            self.used_percent.clamp(0.0, 100.0)
+        } else {
+            (100.0 - self.used_percent).clamp(0.0, 100.0)
+        }
+    }
+
+    /// Consumed quota in this window (0-100).
+    pub fn consumed_percent(&self) -> f64 {
+        if self.is_remaining {
+            (100.0 - self.used_percent).clamp(0.0, 100.0)
+        } else {
+            self.used_percent.clamp(0.0, 100.0)
+        }
+    }
+}
+
+impl AgentUsage {
+    /// Cursor-style monthly limits: Total overview + Auto+Composer / API breakdown.
+    /// Returns `None` for agents that use the generic two-window layout.
+    pub fn cursor_rate_hierarchy(&self) -> Option<(&RateWindow, Vec<&RateWindow>)> {
+        let total = self.session_window.as_ref()?;
+        if total.label.as_deref() != Some("Total") {
+            return None;
+        }
+        let mut breakdown: Vec<&RateWindow> = self.extra_rate_windows.iter().collect();
+        if let Some(api) = &self.weekly_window {
+            breakdown.push(api);
+        }
+        breakdown.sort_by_key(|w| match w.label.as_deref() {
+            Some("Auto+Composer") => 0,
+            Some("API") => 1,
+            _ => 2,
+        });
+        Some((total, breakdown))
+    }
+
+    /// Flat list of all rate-limit windows (generic agents).
+    pub fn rate_windows_flat(&self) -> Vec<&RateWindow> {
+        let mut v = Vec::new();
+        if let Some(w) = &self.session_window {
+            v.push(w);
+        }
+        if let Some(w) = &self.weekly_window {
+            v.push(w);
+        }
+        for w in &self.extra_rate_windows {
+            v.push(w);
+        }
+        v
+    }
 }
 
 /// Token usage breakdown

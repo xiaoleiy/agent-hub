@@ -47,18 +47,18 @@
   }
 </script>
 
-<div class="proxy-info">
+<div class="proxy-info tab-stack">
   {#if error}
-    <p class="error">Failed to load proxy info: {error}</p>
+    <p class="error-state">Failed to load proxy info: {error}</p>
   {:else if !info}
-    <p class="loading">Loading proxy information...</p>
+    <p class="loading-state">Loading…</p>
   {:else}
     <!-- System Proxy -->
-    <div class="section">
-      <h3>System Proxy</h3>
+    <section class="section-card">
+      <h3 class="panel-title">System Proxy</h3>
       <div class="service-name">
-        <span class="label">Active Service</span>
-        <span class="value">{info.system_proxy.active_service}</span>
+        <span class="field-label">Active Service</span>
+        <span class="field-value">{info.system_proxy.active_service}</span>
       </div>
 
       <div class="proxy-grid">
@@ -105,16 +105,16 @@
 
       {#if info.system_proxy.bypass.length > 0}
         <div class="bypass">
-          <span class="label">Bypass</span>
+          <span class="field-label">Bypass</span>
           <span class="bypass-list">{info.system_proxy.bypass.join(", ")}</span>
         </div>
       {/if}
-    </div>
+    </section>
 
     <!-- VPN Connections -->
     {#if info.vpn_connections.length > 0}
-      <div class="section">
-        <h3>VPN Connections</h3>
+      <section class="section-card">
+        <h3 class="panel-title">VPN Connections</h3>
         <div class="vpn-list">
           {#each info.vpn_connections as vpn}
             <div class="vpn-item" class:connected={vpn.connected}>
@@ -127,13 +127,13 @@
             </div>
           {/each}
         </div>
-      </div>
+      </section>
     {/if}
 
     <!-- Active Proxy Client -->
     {#if info.active_client}
-      <div class="section">
-        <h3>Proxy Client</h3>
+      <section class="section-card">
+        <h3 class="panel-title">Proxy Client</h3>
         <div class="client-card">
           <div class="client-header">
             <span class="client-name">{info.active_client.name}</span>
@@ -160,18 +160,18 @@
             {/if}
           </div>
         </div>
-      </div>
+      </section>
     {:else}
-      <div class="section">
-        <h3>Proxy Client</h3>
-        <p class="no-client">No proxy client detected</p>
-      </div>
+      <section class="section-card">
+        <h3 class="panel-title">Proxy Client</h3>
+        <p class="empty-state">No proxy client detected</p>
+      </section>
     {/if}
 
     <!-- Proxy Nodes (from client API) -->
     {#if info.proxy_nodes.length > 0}
-      <div class="section">
-        <h3>Proxy Nodes</h3>
+      <section class="section-card">
+        <h3 class="panel-title">Proxy Nodes</h3>
         <div class="node-list">
           {#each info.proxy_nodes as node}
             <div class="node-group">
@@ -204,45 +204,18 @@
             </div>
           {/each}
         </div>
-      </div>
+      </section>
     {/if}
   {/if}
 </div>
 
 <style>
-  .proxy-info {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  /* Flat sections (no outer card) — consistent with the agent tabs; the inner
-     cards (proxy-card, vpn-item, client-card, node-group) carry the surfaces. */
-  .section h3 {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-strong);
-    margin-bottom: 8px;
-  }
-
   .service-name {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 8px;
-    font-size: 0.82rem;
-  }
-
-  .label {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .value {
-    color: var(--text-strong);
-    font-weight: 500;
+    font-size: 0.85rem;
   }
 
   .proxy-grid {
@@ -264,7 +237,7 @@
   }
 
   .proxy-type {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -407,18 +380,16 @@
   }
 
   .detail-label {
+    font-size: 0.8rem;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .detail-value {
     color: var(--text-strong);
     font-family: "SF Mono", "Fira Code", monospace;
     font-size: 0.8rem;
-  }
-
-  .no-client {
-    color: var(--text-dim);
-    font-size: 0.85rem;
   }
 
   .node-list {
@@ -531,19 +502,5 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .error {
-    color: var(--danger);
-    font-size: 0.85rem;
-    text-align: center;
-    padding: 20px;
-  }
-
-  .loading {
-    color: var(--text-dim);
-    font-size: 0.9rem;
-    text-align: center;
-    padding: 30px;
   }
 </style>

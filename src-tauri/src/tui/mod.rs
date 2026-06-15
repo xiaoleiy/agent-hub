@@ -1,7 +1,7 @@
 use crate::core_modules::{agents, keepalive, network, proxy, system};
 use crate::models::types::{
-    AgentInfo, AgentUsage, KeepAliveStatus, NetworkInfo, ProxyInfo, Session, SystemStatus,
-    UsageStats,
+    AgentInfo, AgentUsage, KeepAliveStatus, NetworkInfo, ProxyInfo, RateWindow, Session,
+    SystemStatus, UsageStats,
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
@@ -20,6 +20,9 @@ use std::io;
 use std::time::{Duration, Instant};
 
 const MIN_DASHBOARD_WIDTH_FOR_SIDE_BY_SIDE_AGENTS: u16 = 140;
+const AGENT_DETAIL_REFRESH: Duration = Duration::from_secs(60);
+const PROXY_REFRESH: Duration = Duration::from_secs(30);
+const DASHBOARD_QUOTA_REFRESH: Duration = Duration::from_secs(60);
 
 struct DashboardLayout {
     system: Rect,
@@ -34,8 +37,11 @@ struct App {
     agents: Vec<AgentInfo>,
     /// Sessions grouped by agent index (lazy: filled when the agent tab is viewed)
     agent_sessions: Vec<Vec<Session>>,
-    /// 5h usage per agent — drives the Dashboard mini chart
+    /// 5h activity per agent (legacy; kept for future use)
     agent_usage_5h: Vec<UsageStats>,
+    /// Quota remaining % per agent — drives the Dashboard comparison chart
+    dashboard_quota_remaining: Vec<f64>,
+    dashboard_quota_refreshed_at: Option<Instant>,
     /// Rich usage per agent (lazy: None until the agent tab is viewed)
     agent_rich_usage: Vec<Option<AgentUsage>>,
     /// Proxy/VPN info (lazy: None until the Proxy tab is viewed — probing is slow)
@@ -46,6 +52,9 @@ struct App {
     network_loaded: bool,
     /// Per-agent flag: has the agent detail (sessions + rich usage) been loaded?
     agent_detail_loaded: Vec<bool>,
+    /// When each agent's detail was last refreshed (for throttling).
+    agent_detail_refreshed_at: Vec<Option<Instant>>,
+    proxy_refreshed_at: Option<Instant>,
 }
 
 /// Which kind of data the currently-active tab needs loaded.
@@ -64,6 +73,8 @@ impl App {
             agents: Vec::new(),
             agent_sessions: Vec::new(),
             agent_usage_5h: Vec::new(),
+            dashboard_quota_remaining: Vec::new(),
+            dashboard_quota_refreshed_at: None,
             agent_rich_usage: Vec::new(),
             proxy: None,
             keepalive: keepalive::get_keepalive_status(),
@@ -71,6 +82,8 @@ impl App {
             last_refresh: Instant::now(),
             network_loaded: false,
             agent_detail_loaded: Vec::new(),
+            agent_detail_refreshed_at: Vec::new(),
+            proxy_refreshed_at: None,
         };
         // Startup only loads what the Dashboard (initial tab) needs. Proxy probing
         // and per-agent detail are loaded lazily when those tabs are first viewed.
@@ -136,6 +149,25 @@ impl App {
         self.agent_sessions.resize(n, Vec::new());
         self.agent_rich_usage.resize(n, None);
         self.agent_detail_loaded.resize(n, false);
+        self.agent_detail_refreshed_at.resize(n, None);
+        self.dashboard_quota_remaining.resize(n, 0.0);
+    }
+
+    fn agent_detail_needs_refresh(&self, idx: usize) -> bool {
+        if !self.agent_detail_loaded.get(idx).copied().unwrap_or(false) {
+            return true;
+        }
+        match self.agent_detail_refreshed_at.get(idx).and_then(|t| *t) {
+            None => true,
+            Some(t) => t.elapsed() >= AGENT_DETAIL_REFRESH,
+        }
+    }
+
+    fn proxy_needs_refresh(&self) -> bool {
+        match self.proxy_refreshed_at {
+            None => true,
+            Some(t) => t.elapsed() >= PROXY_REFRESH,
+        }
     }
 
     /// Load the data the Dashboard shows. Cheap enough to run on every tick.
@@ -153,12 +185,25 @@ impl App {
             }
         }
 
-        // 5h usage drives the dashboard mini bar chart.
+        // 5h activity counts (legacy).
         self.agent_usage_5h = self
             .agents
             .iter()
             .map(|a| agents::get_usage(&a.agent_type, "5h"))
             .collect();
+
+        let quota_stale = self
+            .dashboard_quota_refreshed_at
+            .map(|t| t.elapsed() >= DASHBOARD_QUOTA_REFRESH)
+            .unwrap_or(true);
+        if quota_stale {
+            self.dashboard_quota_remaining = self
+                .agents
+                .iter()
+                .map(|a| primary_quota_remaining(&agents::get_rich_usage(&a.agent_type)))
+                .collect();
+            self.dashboard_quota_refreshed_at = Some(Instant::now());
+        }
     }
 
     /// Re-read keep-alive status (cheap).
@@ -170,6 +215,7 @@ impl App {
     /// so only called when the Proxy tab is visible.
     fn refresh_proxy(&mut self) {
         self.proxy = Some(proxy::get_proxy_info());
+        self.proxy_refreshed_at = Some(Instant::now());
     }
 
     /// Load sessions + rich usage for one agent (index into `agents`).
@@ -181,6 +227,9 @@ impl App {
         self.agent_sessions[idx] = agents::get_sessions(&agent_type);
         self.agent_rich_usage[idx] = Some(agents::get_rich_usage(&agent_type));
         self.agent_detail_loaded[idx] = true;
+        if idx < self.agent_detail_refreshed_at.len() {
+            self.agent_detail_refreshed_at[idx] = Some(Instant::now());
+        }
     }
 
     /// Lazily load the active tab's data on first view (cheap if already loaded).
@@ -188,21 +237,23 @@ impl App {
         match self.active_tab_kind() {
             TabKind::Proxy if self.proxy.is_none() => self.refresh_proxy(),
             TabKind::Agent(idx) if !self.agent_detail_loaded.get(idx).copied().unwrap_or(false) => {
-                self.refresh_agent_detail(idx)
+                self.refresh_agent_detail(idx);
             }
             _ => {}
         }
     }
 
-    /// Periodic refresh: live system stats plus only the active tab's data.
+    /// Periodic refresh: live system stats plus only the active tab's data (throttled).
     fn tick_refresh(&mut self) {
         self.system = system::get_system_status();
         self.keepalive = keepalive::get_keepalive_status();
         match self.active_tab_kind() {
             TabKind::Dashboard => self.refresh_dashboard(),
-            TabKind::Proxy => self.refresh_proxy(),
-            TabKind::Agent(idx) => self.refresh_agent_detail(idx),
-            TabKind::KeepAlive => {}
+            TabKind::Proxy if self.proxy_needs_refresh() => self.refresh_proxy(),
+            TabKind::Agent(idx) if self.agent_detail_needs_refresh(idx) => {
+                self.refresh_agent_detail(idx);
+            }
+            TabKind::KeepAlive | TabKind::Proxy | TabKind::Agent(_) => {}
         }
         // Agents list may have changed length; keep active_tab in range.
         let count = self.tab_count();
@@ -216,6 +267,7 @@ impl App {
         let count = self.tab_count();
         if count > 0 {
             self.active_tab = (self.active_tab + 1) % count;
+            self.ensure_active_tab_loaded();
         }
     }
 
@@ -227,6 +279,7 @@ impl App {
             } else {
                 self.active_tab - 1
             };
+            self.ensure_active_tab_loaded();
         }
     }
 
@@ -294,26 +347,31 @@ pub fn run_tui() {
                             let idx = (c as usize) - ('1' as usize);
                             if idx < tab_count {
                                 app.active_tab = idx;
+                                app.ensure_active_tab_loaded();
                             }
                         }
                         // '0' = Keep-Alive (last tab)
                         KeyCode::Char('0') => {
                             app.active_tab = last_tab;
+                            app.ensure_active_tab_loaded();
                         }
                         // Agent shortcuts: q,w,e for first 3 agents
                         KeyCode::Char('w') => {
                             if !installed.is_empty() {
                                 app.active_tab = 1;
+                                app.ensure_active_tab_loaded();
                             }
                         }
                         KeyCode::Char('e') => {
                             if installed.len() >= 2 {
                                 app.active_tab = 2;
+                                app.ensure_active_tab_loaded();
                             }
                         }
                         KeyCode::Char('r') => {
                             if installed.len() >= 3 {
                                 app.active_tab = 3;
+                                app.ensure_active_tab_loaded();
                             }
                         }
                         KeyCode::Char(' ') => {
@@ -471,48 +529,45 @@ fn draw_dashboard(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn dashboard_layout(area: Rect) -> DashboardLayout {
+    // 2×2 grid: System | Network on top, Agents | Usage below — equal row/column pairs.
     if area.width < MIN_DASHBOARD_WIDTH_FOR_SIDE_BY_SIDE_AGENTS {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(12),
-                Constraint::Length(6),
-                Constraint::Min(5),
+                Constraint::Ratio(1, 4),
+                Constraint::Ratio(1, 4),
+                Constraint::Ratio(1, 4),
+                Constraint::Ratio(1, 4),
             ])
+            .split(area);
+
+        DashboardLayout {
+            system: rows[0],
+            network: rows[1],
+            agents: rows[2],
+            usage: rows[3],
+        }
+    } else {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Ratio(1, 1), Constraint::Ratio(1, 1)])
             .split(area);
 
         let top = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints([Constraint::Ratio(1, 1), Constraint::Ratio(1, 1)])
             .split(rows[0]);
+
+        let bottom = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 1), Constraint::Ratio(1, 1)])
+            .split(rows[1]);
 
         DashboardLayout {
             system: top[0],
             network: top[1],
-            agents: rows[1],
-            usage: rows[2],
-        }
-    } else {
-        let columns = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(area);
-
-        let left = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(12), Constraint::Min(5)])
-            .split(columns[0]);
-
-        let right = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(10), Constraint::Min(0)])
-            .split(columns[1]);
-
-        DashboardLayout {
-            system: left[0],
-            agents: left[1],
-            network: right[0],
-            usage: right[1],
+            agents: bottom[0],
+            usage: bottom[1],
         }
     }
 }
@@ -747,7 +802,11 @@ fn draw_agent_tab(
     // Determine layout based on available data
     let has_rate_limits = rich_usage
         .as_ref()
-        .map(|u| u.session_window.is_some() || u.weekly_window.is_some())
+        .map(|u| {
+            u.session_window.is_some()
+                || u.weekly_window.is_some()
+                || !u.extra_rate_windows.is_empty()
+        })
         .unwrap_or(false);
     let has_tokens = rich_usage
         .as_ref()
@@ -755,7 +814,19 @@ fn draw_agent_tab(
         .unwrap_or(false);
 
     let header_height = 5;
-    let rate_height = if has_rate_limits { 5 } else { 0 };
+    let rate_height = if has_rate_limits {
+        match rich_usage {
+            Some(u) if u.cursor_rate_hierarchy().is_some() => 11,
+            Some(u) => {
+                let n = u.rate_windows_flat().len().max(1) as u16;
+                // Border rows (2) + 3 text lines per window (label, bar, reset).
+                2 + n * 3
+            }
+            None => 0,
+        }
+    } else {
+        0
+    };
     let token_height = if has_tokens { 5 } else { 0 };
 
     let mut constraints = vec![Constraint::Length(header_height)];
@@ -878,42 +949,156 @@ fn draw_agent_header(f: &mut Frame, agent: &AgentInfo, area: Rect) {
 }
 
 fn draw_rate_limits(f: &mut Frame, usage: &AgentUsage, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Rate Limits ");
+    if let Some((total, breakdown)) = usage.cursor_rate_hierarchy() {
+        draw_rate_limits_hierarchical(f, total, &breakdown, area);
+        return;
+    }
 
+    let windows = usage.rate_windows_flat();
+    let block = Block::default().borders(Borders::ALL).title(" Rate Limits ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    let columns = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(inner);
-
-    // Session window (or provider-specific primary, e.g. Cursor "Plan")
-    if let Some(ref w) = usage.session_window {
-        let label = w.label.as_deref().unwrap_or("Session");
-        draw_rate_bar(f, label, w.used_percent, w.window_minutes, columns[0]);
+    if windows.is_empty() {
+        return;
     }
 
-    // Weekly window (or provider-specific secondary, e.g. Cursor "On-Demand")
-    if let Some(ref w) = usage.weekly_window {
-        let label = w.label.as_deref().unwrap_or("Weekly");
-        draw_rate_bar(f, label, w.used_percent, w.window_minutes, columns[1]);
+    let row_h = 3u16;
+    let constraints: Vec<Constraint> = windows.iter().map(|_| Constraint::Length(row_h)).collect();
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    for (w, row) in windows.iter().zip(rows.iter()) {
+        draw_rate_bar(f, w, *row);
     }
 }
 
-fn draw_rate_bar(f: &mut Frame, label: &str, used_pct: f64, window_mins: u64, area: Rect) {
-    let color = if used_pct >= 90.0 {
+fn draw_rate_limits_hierarchical(
+    f: &mut Frame,
+    total: &crate::models::types::RateWindow,
+    breakdown: &[&crate::models::types::RateWindow],
+    area: Rect,
+) {
+    let block = Block::default().borders(Borders::ALL).title(" Rate Limits ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let overview_h = 4u16;
+    let breakdown_title_h = if breakdown.is_empty() { 0 } else { 1 };
+    let breakdown_rows_h = breakdown.len() as u16 * 3;
+    let mut constraints = vec![Constraint::Length(overview_h)];
+    if breakdown_title_h > 0 {
+        constraints.push(Constraint::Length(1)); // spacer
+        constraints.push(Constraint::Length(breakdown_title_h));
+        constraints.push(Constraint::Length(breakdown_rows_h));
+    }
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    draw_rate_bar(f, total, chunks[0]);
+
+    if breakdown.is_empty() {
+        return;
+    }
+
+    let title_area = chunks[2];
+    f.render_widget(
+        Paragraph::new(" Breakdown").style(Style::default().fg(Color::DarkGray)),
+        title_area,
+    );
+
+    let row_h = 3u16;
+    let rows: Vec<Constraint> = breakdown
+        .iter()
+        .map(|_| Constraint::Length(row_h))
+        .collect();
+    let row_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(rows)
+        .split(chunks[3]);
+
+    for (i, (w, row)) in breakdown.iter().zip(row_chunks.iter()).enumerate() {
+        let prefix = if i + 1 == breakdown.len() { "└" } else { "├" };
+        draw_rate_bar_nested(f, prefix, w, *row);
+    }
+}
+
+fn draw_rate_bar_nested(f: &mut Frame, prefix: &str, w: &RateWindow, area: Rect) {
+    let color = quota_stress_color(w);
+    let label = w.label.as_deref().unwrap_or("—");
+    let window_str = window_label(w.window_minutes);
+    let kind = if w.is_remaining {
+        "remaining"
+    } else {
+        "used"
+    };
+    let bar_w = area.width.saturating_sub(5) as usize;
+    let lines = vec![Line::from(vec![
+        Span::styled(
+            format!(" {prefix} {label} ({window_str})"),
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            format!("{:.1}% {kind}", w.used_percent),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        ),
+    ])];
+    f.render_widget(Paragraph::new(lines), Rect {
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: 1,
+    });
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            format!(" {prefix} {}", format_bar(w.used_percent, bar_w)),
+            Style::default().fg(color),
+        ))),
+        Rect {
+            x: area.x,
+            y: area.y + 1,
+            width: area.width,
+            height: 1,
+        },
+    );
+    if let Some(reset) = w.resets_at.as_deref() {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!(" {prefix} resets {}", format_reset_title(reset)),
+                Style::default().fg(Color::DarkGray),
+            ))),
+            Rect {
+                x: area.x,
+                y: area.y + 2,
+                width: area.width,
+                height: 1,
+            },
+        );
+    }
+}
+
+fn quota_stress_color(w: &RateWindow) -> Color {
+    rate_color(w.consumed_percent())
+}
+
+fn rate_color(used_pct: f64) -> Color {
+    if used_pct >= 90.0 {
         Color::Red
     } else if used_pct >= 70.0 {
         Color::Yellow
     } else {
         Color::Green
-    };
+    }
+}
 
-    let window_str = if window_mins >= 43200 {
-        format!("{}mo", window_mins / 43200)
+fn window_label(window_mins: u64) -> String {
+    if window_mins >= 43200 {
+        "monthly".to_string()
     } else if window_mins >= 10080 {
         format!("{}w", window_mins / 10080)
     } else if window_mins >= 1440 {
@@ -921,10 +1106,45 @@ fn draw_rate_bar(f: &mut Frame, label: &str, used_pct: f64, window_mins: u64, ar
     } else if window_mins >= 60 {
         format!("{}h", window_mins / 60)
     } else {
-        format!("{}m", window_mins)
+        format!("{window_mins}m")
+    }
+}
+
+fn format_reset_title(iso: &str) -> String {
+    use chrono::{DateTime, Utc};
+    let normalized = iso.replace('Z', "+00:00");
+    let dt = DateTime::parse_from_rfc3339(&normalized)
+        .ok()
+        .map(|d| d.with_timezone(&Utc))
+        .or_else(|| iso.parse::<DateTime<Utc>>().ok());
+    let Some(dt) = dt else {
+        return iso.to_string();
+    };
+    let now = Utc::now();
+    let date = dt.format("%b %d").to_string();
+    if dt <= now {
+        return date;
+    }
+    let days = (dt - now).num_days();
+    if days >= 1 {
+        format!("{date} (in {days}d)")
+    } else {
+        let hours = (dt - now).num_hours().max(1);
+        format!("{date} (in {hours}h)")
+    }
+}
+
+fn draw_rate_bar(f: &mut Frame, w: &RateWindow, area: Rect) {
+    let color = quota_stress_color(w);
+    let label = w.label.as_deref().unwrap_or("Limit");
+    let window_str = window_label(w.window_minutes);
+    let kind = if w.is_remaining {
+        "remaining"
+    } else {
+        "used"
     };
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(vec![
             Span::styled(
                 format!(" {} ({})", label, window_str),
@@ -932,15 +1152,21 @@ fn draw_rate_bar(f: &mut Frame, label: &str, used_pct: f64, window_mins: u64, ar
             ),
             Span::raw("  "),
             Span::styled(
-                format!("{:.1}%", used_pct),
+                format!("{:.1}% {}", w.used_percent, kind),
                 Style::default().fg(color).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(Span::styled(
-            format_bar(used_pct, area.width.saturating_sub(2) as usize),
+            format_bar(w.used_percent, area.width.saturating_sub(2) as usize),
             Style::default().fg(color),
         )),
     ];
+    if let Some(reset) = w.resets_at.as_deref() {
+        lines.push(Line::from(Span::styled(
+            format!(" resets {}", format_reset_title(reset)),
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
 
     let p = Paragraph::new(lines);
     f.render_widget(p, area);
@@ -1108,31 +1334,39 @@ fn draw_agent_sessions(f: &mut Frame, agent: &AgentInfo, sessions: &[Session], a
 // ─── Usage (legacy full-page, used by dashboard mini) ───────────────────────
 
 fn draw_usage_mini(f: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default().borders(Borders::ALL).title(" Usage ");
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Quota (remaining %) ");
 
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Collect all usage
-    let all_usage: Vec<&UsageStats> = app.agent_usage_5h.iter().collect();
-    if all_usage.is_empty() {
-        let p = Paragraph::new("No usage data").style(Style::default().fg(Color::DarkGray));
+    if app.agents.is_empty() {
+        let p = Paragraph::new("No agents").style(Style::default().fg(Color::DarkGray));
         f.render_widget(p, inner);
         return;
     }
 
-    let bars: Vec<Bar> = all_usage
+    let bars: Vec<Bar> = app
+        .agents
         .iter()
         .enumerate()
-        .map(|(i, u)| {
+        .map(|(i, a)| {
             let color = match i % 3 {
                 0 => Color::Cyan,
                 1 => Color::Green,
                 _ => Color::Yellow,
             };
+            let remaining = app
+                .dashboard_quota_remaining
+                .get(i)
+                .copied()
+                .unwrap_or(0.0)
+                .round()
+                .clamp(0.0, 100.0) as u64;
             Bar::default()
-                .label(Line::from(u.agent.chars().take(8).collect::<String>()))
-                .value(u.total_interactions as u64)
+                .label(Line::from(a.name.chars().take(8).collect::<String>()))
+                .value(remaining as u64)
                 .style(Style::default().fg(color))
         })
         .collect();
@@ -1143,6 +1377,16 @@ fn draw_usage_mini(f: &mut Frame, app: &App, area: Rect) {
         .bar_width(9)
         .bar_gap(1);
     f.render_widget(barchart, inner);
+}
+
+/// Primary rate-limit window as remaining % for cross-agent dashboard comparison.
+fn primary_quota_remaining(usage: &AgentUsage) -> f64 {
+    usage
+        .session_window
+        .as_ref()
+        .or(usage.weekly_window.as_ref())
+        .map(|w| w.remaining_percent())
+        .unwrap_or(0.0)
 }
 
 // ─── Proxy / VPN ─────────────────────────────────────────────────────────────

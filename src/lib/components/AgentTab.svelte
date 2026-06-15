@@ -62,15 +62,62 @@
     if (!isoString) return "";
     const date = new Date(isoString);
     const now = new Date();
-    const diff = /** @type {any} */ (now) - /** @type {any} */ (date);
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    const diff = /** @type {any} */ (date) - /** @type {any} */ (now);
+    const absMins = Math.abs(Math.floor(diff / 60000));
+    if (absMins < 1) return diff >= 0 ? "soon" : "just now";
+    if (absMins < 60) return diff >= 0 ? `in ${absMins}m` : `${absMins}m ago`;
+    const hours = Math.floor(absMins / 60);
+    if (hours < 24) return diff >= 0 ? `in ${hours}h` : `${hours}h ago`;
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return diff >= 0 ? `in ${days}d` : `${days}d ago`;
   }
+
+  /** @param {string} isoString */
+  function formatResetAt(isoString) {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    const when = date.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    return `Resets ${when} (${relativeTime(isoString)})`;
+  }
+
+  /** @param {any} usage */
+  function collectRateWindows(usage) {
+    if (!usage) return [];
+    /** @type {any[]} */
+    const windows = [];
+    if (usage.session_window) windows.push(usage.session_window);
+    if (usage.weekly_window) windows.push(usage.weekly_window);
+    if (usage.extra_rate_windows?.length) windows.push(...usage.extra_rate_windows);
+    return windows;
+  }
+
+  /** @param {any} usage */
+  function splitRateLimits(usage) {
+    if (!usage) return { total: null, breakdown: [], flat: [] };
+    const total =
+      usage.session_window?.label === "Total" ? usage.session_window : null;
+    if (total) {
+      /** @type {any[]} */
+      const breakdown = [];
+      for (const w of usage.extra_rate_windows ?? []) breakdown.push(w);
+      if (usage.weekly_window) breakdown.push(usage.weekly_window);
+      const order = ["Auto+Composer", "API"];
+      breakdown.sort(
+        (a, b) =>
+          (order.indexOf(a.label) === -1 ? 99 : order.indexOf(a.label)) -
+          (order.indexOf(b.label) === -1 ? 99 : order.indexOf(b.label)),
+      );
+      return { total, breakdown, flat: [] };
+    }
+    return { total: null, breakdown: [], flat: collectRateWindows(usage) };
+  }
+
+  const rateLayout = $derived(splitRateLimits(richUsage));
 
   /** @param {number} n */
   function fmtTokens(n) {
@@ -80,14 +127,32 @@
   }
 
   /** @param {number} percent */
-  function usageBarColor(percent) {
-    if (percent >= 90) return "var(--danger)";
-    if (percent >= 70) return "var(--warn)";
+  /** @param {any} w */
+  function quotaStress(w) {
+    return w.is_remaining ? 100 - w.used_percent : w.used_percent;
+  }
+
+  /** @param {any} w */
+  function quotaBarColor(w) {
+    const stress = quotaStress(w);
+    if (stress >= 90) return "var(--danger)";
+    if (stress >= 70) return "var(--warn)";
     return "var(--ok)";
+  }
+
+  /** @param {any} w */
+  function quotaBarWidth(w) {
+    return Math.min(w.used_percent, 100);
+  }
+
+  /** @param {any} w */
+  function quotaLabel(w) {
+    return w.is_remaining ? "remaining" : "used";
   }
 
   /** @param {number} mins */
   function formatWindow(mins) {
+    if (mins >= 43200) return "monthly";
     if (mins >= 10080) return `${Math.round(mins / 10080)}w`;
     if (mins >= 1440) return `${Math.round(mins / 1440)}d`;
     if (mins >= 60) return `${Math.round(mins / 60)}h`;
@@ -95,9 +160,9 @@
   }
 </script>
 
-<div class="agent-tab">
+<div class="agent-tab tab-stack">
   <!-- Agent Header -->
-  <div class="agent-header">
+  <div class="section-card agent-header">
     <div class="agent-info">
       <span class="dot" class:running={agent.running}></span>
       <span class="name">{agent.name}</span>
@@ -126,59 +191,104 @@
   </div>
 
   <!-- Rate Limit Windows -->
-  {#if richUsage?.session_window || richUsage?.weekly_window}
-    <div class="rate-limits">
-      <h3>Rate Limits</h3>
-      <div class="rate-grid">
-        {#if richUsage.session_window}
-          {@const w = richUsage.session_window}
-          <div class="rate-card">
-            <div class="rate-header">
-              <span class="rate-label">{w.label ?? "Session"} ({formatWindow(w.window_minutes)})</span>
-              <span class="rate-percent" style="color: {usageBarColor(w.used_percent)}">
-                {w.used_percent.toFixed(1)}% used
-              </span>
-            </div>
-            <div class="rate-bar-track">
-              <div
-                class="rate-bar-fill"
-                style="width: {Math.min(w.used_percent, 100)}%; background: {usageBarColor(w.used_percent)}"
-              ></div>
-            </div>
-            {#if w.resets_at}
-              <div class="rate-reset">resets {relativeTime(w.resets_at)}</div>
-            {/if}
-          </div>
-        {/if}
-        {#if richUsage.weekly_window}
-          {@const w = richUsage.weekly_window}
-          <div class="rate-card">
-            <div class="rate-header">
-              <span class="rate-label">{w.label ?? "Weekly"} ({formatWindow(w.window_minutes)})</span>
-              <span class="rate-percent" style="color: {usageBarColor(w.used_percent)}">
-                {w.used_percent.toFixed(1)}% used
-              </span>
-            </div>
-            <div class="rate-bar-track">
-              <div
-                class="rate-bar-fill"
-                style="width: {Math.min(w.used_percent, 100)}%; background: {usageBarColor(w.used_percent)}"
-              ></div>
-            </div>
-            {#if w.resets_at}
-              <div class="rate-reset">resets {relativeTime(w.resets_at)}</div>
-            {/if}
-          </div>
-        {/if}
+  {#if rateLayout.total || rateLayout.breakdown.length > 0 || rateLayout.flat.length > 0}
+    <section class="section-card rate-limits">
+      <div class="panel-title-row">
+        <h3 class="panel-title">Rate Limits</h3>
       </div>
-    </div>
+
+      {#if rateLayout.total}
+        {@const w = rateLayout.total}
+        <div class="rate-hierarchy">
+          <div class="rate-overview inner-surface">
+            <div class="rate-header">
+              <span class="rate-label rate-label-overview">
+                {w.label ?? "Total"}
+                <span class="rate-sublabel">monthly overview</span>
+              </span>
+              <span class="rate-percent" style="color: {quotaBarColor(w)}">
+                {w.used_percent.toFixed(1)}% {quotaLabel(w)}
+              </span>
+            </div>
+            <div class="rate-bar-track bar-track rate-bar-track-overview">
+              <div
+                class="rate-bar-fill bar-fill"
+                style="width: {quotaBarWidth(w)}%; background: {quotaBarColor(w)}"
+              ></div>
+            </div>
+            {#if w.resets_at}
+              <span class="rate-reset">{formatResetAt(w.resets_at)}</span>
+            {/if}
+          </div>
+
+          {#if rateLayout.breakdown.length > 0}
+            <div class="rate-breakdown-panel">
+              <span class="rate-breakdown-title">Breakdown</span>
+              <div class="rate-breakdown-list">
+                {#each rateLayout.breakdown as w, i}
+                  <div class="rate-row">
+                    <span class="rate-tree" aria-hidden="true"
+                      >{i + 1 === rateLayout.breakdown.length ? "└" : "├"}</span
+                    >
+                    <div class="rate-row-content">
+                      <div class="rate-header">
+                        <span class="rate-label">{w.label ?? "—"} (monthly)</span>
+                        <span class="rate-percent" style="color: {quotaBarColor(w)}">
+                          {w.used_percent.toFixed(1)}% {quotaLabel(w)}
+                        </span>
+                      </div>
+                      <div class="rate-bar-track bar-track">
+                        <div
+                          class="rate-bar-fill bar-fill"
+                          style="width: {quotaBarWidth(w)}%; background: {quotaBarColor(w)}"
+                        ></div>
+                      </div>
+                      {#if w.resets_at}
+                        <span class="rate-reset">{formatResetAt(w.resets_at)}</span>
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <!-- Generic agents: flat grid -->
+        <div class="rate-grid">
+          {#each rateLayout.flat as w}
+            <div class="rate-card inner-surface">
+              <div class="rate-header">
+                <span class="rate-label"
+                  >{w.label ?? "Limit"}{#if w.window_minutes >= 43200}
+                    (monthly){:else}
+                    ({formatWindow(w.window_minutes)}){/if}</span
+                >
+                <span class="rate-percent" style="color: {quotaBarColor(w)}">
+                  {w.used_percent.toFixed(1)}% {quotaLabel(w)}
+                </span>
+              </div>
+              <div class="rate-bar-track bar-track">
+                <div
+                  class="rate-bar-fill bar-fill"
+                  style="width: {quotaBarWidth(w)}%; background: {quotaBarColor(w)}"
+                ></div>
+              </div>
+              {#if w.resets_at}
+                <span class="rate-reset">{formatResetAt(w.resets_at)}</span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
   {/if}
 
   <!-- Token Usage -->
   {#if richUsage?.tokens}
     {@const t = richUsage.tokens}
-    <div class="tokens-section">
-      <h3>Token Usage</h3>
+    <section class="section-card tokens-section">
+      <h3 class="panel-title">Token Usage</h3>
       <div class="token-grid">
         <div class="token-card">
           <div class="token-label">Input</div>
@@ -201,13 +311,13 @@
           <div class="token-value">{fmtTokens(t.total_tokens)}</div>
         </div>
       </div>
-    </div>
+    </section>
   {/if}
 
   <!-- Model Breakdowns -->
   {#if richUsage?.model_breakdowns?.length > 0}
-    <div class="models-section">
-      <h3>Models</h3>
+    <section class="section-card models-section">
+      <h3 class="panel-title">Models</h3>
       <div class="model-list">
         {#each richUsage.model_breakdowns as m}
           <div class="model-row">
@@ -217,12 +327,12 @@
           </div>
         {/each}
       </div>
-    </div>
+    </section>
   {/if}
 
   <!-- Summary Stats -->
-  {#if richUsage && !richUsage.tokens && !richUsage.session_window}
-    <div class="summary-section">
+  {#if richUsage && !richUsage.tokens && !rateLayout.total && rateLayout.flat.length === 0}
+    <section class="section-card summary-section">
       <div class="summary-grid">
         <div class="summary-card">
           <div class="summary-label">Total Interactions</div>
@@ -233,17 +343,17 @@
           <div class="summary-value">{richUsage.total_sessions}</div>
         </div>
       </div>
-    </div>
+    </section>
   {/if}
 
   <!-- Sessions Section -->
-  <div class="sessions-section">
-    <div class="sessions-head">
-      <h3>Active Sessions</h3>
+  <section class="section-card sessions-section">
+    <div class="panel-title-row">
+      <h3 class="panel-title">Active Sessions</h3>
       <span class="sessions-count">{sessions.length}</span>
     </div>
     {#if sessions.length === 0}
-      <p class="empty">No active sessions</p>
+      <p class="empty-state">No active sessions</p>
     {:else}
       <div class="session-list">
         {#each pagedSessions as sess}
@@ -287,26 +397,20 @@
         </div>
       {/if}
     {/if}
-  </div>
+  </section>
 </div>
 
 <style>
-  .agent-tab {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
   .agent-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 6px 8px;
-    padding: 9px 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 9px;
+  }
+
+  .rate-limits {
+    flex-shrink: 0;
   }
 
   .agent-info {
@@ -363,74 +467,129 @@
   .badge.idle { background: var(--warn-tint); color: var(--warn); }
   .badge.missing { background: var(--border-strong); color: var(--text-dim); }
 
-  h3 {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-strong);
-    margin-bottom: 8px;
+  .rate-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
-  /* Rate Limits */
-  .rate-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+  .rate-hierarchy {
+    display: flex;
+    flex-direction: column;
     gap: 8px;
   }
 
-  .rate-card {
+  .rate-label-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+
+  .rate-sublabel {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .rate-breakdown-panel {
+    padding: 10px 10px 10px 12px;
     background: var(--surface-2);
     border-radius: 8px;
-    padding: 10px;
+    border-left: 3px solid var(--border-strong);
+  }
+
+  .rate-breakdown-title {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+
+  .rate-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rate-row {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: start;
+  }
+
+  .rate-tree {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.35;
+    padding-top: 1px;
+    text-align: center;
+  }
+
+  .rate-row-content {
+    min-width: 0;
+  }
+
+  .rate-row-content .rate-header {
+    margin-bottom: 6px;
+  }
+
+  .rate-row-content .rate-label {
+    font-size: 0.8rem;
+  }
+
+  .rate-card {
+    flex-shrink: 0;
   }
 
   .rate-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 8px;
     margin-bottom: 8px;
   }
 
   .rate-label {
     font-size: 0.8rem;
     color: var(--text-muted);
+    min-width: 0;
   }
 
   .rate-percent {
     font-size: 0.85rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-  }
-
-  .rate-bar-track {
-    height: 8px;
-    background: var(--surface-3);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .rate-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.5s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .rate-reset {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: var(--text-dim);
-    margin-top: 4px;
+    margin-top: 6px;
+    display: block;
   }
 
   /* Tokens */
   .token-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 5px;
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+    gap: 6px;
   }
 
   .token-card {
     background: var(--surface-2);
-    border-radius: 7px;
-    padding: 7px 4px;
+    border-radius: 8px;
+    padding: 8px 4px;
     text-align: center;
   }
 
@@ -512,7 +671,7 @@
   }
 
   .summary-label {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -526,15 +685,6 @@
   }
 
   /* Sessions */
-  .sessions-head {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-bottom: 6px;
-  }
-
-  .sessions-head h3 { margin-bottom: 0; }
-
   .sessions-count {
     font-size: 0.68rem;
     font-weight: 600;
@@ -616,7 +766,6 @@
   }
 
   .dim { color: var(--text-dim); }
-  .empty { color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 14px; }
 
   /* Pagination */
   .pager {

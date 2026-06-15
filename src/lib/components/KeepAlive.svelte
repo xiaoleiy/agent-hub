@@ -45,7 +45,7 @@
 </script>
 
 <div class="keepalive">
-  <h2>Keep Alive</h2>
+  <h2 class="dashboard-title">Keep Alive</h2>
   <p class="description">Prevent your Mac from sleeping while agents are running</p>
 
   <div class="controls">
@@ -74,17 +74,10 @@
 </div>
 
 <style>
-  .keepalive h2 {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-strong);
-    margin-bottom: 3px;
-  }
-
   .description {
     font-size: 0.78rem;
     color: var(--text-muted);
-    margin-bottom: 10px;
+    margin: -4px 0 10px;
   }
 
   .controls {

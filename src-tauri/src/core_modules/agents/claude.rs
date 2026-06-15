@@ -388,6 +388,7 @@ pub fn get_rich_usage() -> AgentUsage {
         agent: "Claude Code".to_string(),
         session_window,
         weekly_window,
+        extra_rate_windows: vec![],
         tokens: if has_tokens { Some(tokens) } else { None },
         model_breakdowns,
         total_interactions,
@@ -666,6 +667,7 @@ fn fetch_claude_rate_limits_uncached() -> (Option<RateWindow>, Option<RateWindow
             window_minutes: mins,
             resets_at: w.resets_at.clone(),
             label: None,
+            is_remaining: false,
         })
     };
 

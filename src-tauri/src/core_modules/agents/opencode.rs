@@ -322,6 +322,7 @@ pub fn get_rich_usage() -> AgentUsage {
         // OpenCode is bring-your-own-provider with no unified rate-limit API.
         session_window: None,
         weekly_window: None,
+        extra_rate_windows: vec![],
         tokens: if has_tokens { Some(tokens) } else { None },
         model_breakdowns,
         total_interactions: agg.assistant_msgs,

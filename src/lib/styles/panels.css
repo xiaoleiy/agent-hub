@@ -1,0 +1,90 @@
+/* Shared layout + typography for dashboard cards and tab panels */
+
+:global(.dashboard-title) {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 8px;
+}
+
+:global(.panel-title) {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 8px;
+}
+
+:global(.panel-title-row) {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+:global(.panel-title-row .panel-title) {
+  margin-bottom: 0;
+}
+
+:global(.section-card) {
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+
+:global(.field-label) {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+:global(.field-value) {
+  font-size: 0.85rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+:global(.loading-state) {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+:global(.empty-state) {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+
+:global(.error-state) {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+:global(.inner-surface) {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+:global(.bar-track) {
+  height: 8px;
+  background: var(--surface-3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:global(.bar-fill) {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+:global(.tab-stack) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

@@ -298,17 +298,26 @@ pub fn get_rich_usage() -> AgentUsage {
 
     // Primary path: local state.vscdb credentials (same as `cursor-usage` CLI).
     let api = super::cursor_usage::fetch_snapshot();
-    let (session_window, weekly_window) = if api.session_window.is_some() || api.weekly_window.is_some() {
-        (api.session_window, api.weekly_window)
-    } else {
-        // Legacy fallback: browser session cookie (opt-in — triggers Keychain).
-        fetch_cursor_rate_limits()
-    };
+    let (session_window, weekly_window, extra_rate_windows) =
+        if api.session_window.is_some()
+            || api.weekly_window.is_some()
+            || !api.extra_rate_windows.is_empty()
+        {
+            (
+                api.session_window,
+                api.weekly_window,
+                api.extra_rate_windows,
+            )
+        } else {
+            let (s, w) = fetch_cursor_rate_limits();
+            (s, w, vec![])
+        };
 
     AgentUsage {
         agent: "Cursor".to_string(),
         session_window,
         weekly_window,
+        extra_rate_windows,
         tokens: api.tokens,
         model_breakdowns: api.model_breakdowns,
         total_interactions,
@@ -329,8 +338,6 @@ struct UsageSummary {
 #[derive(Deserialize)]
 struct IndividualUsage {
     plan: Option<UsageBlock>,
-    #[serde(rename = "onDemand")]
-    on_demand: Option<UsageBlock>,
 }
 
 #[derive(Deserialize)]
@@ -339,6 +346,8 @@ struct UsageBlock {
     limit: Option<i64>,
     #[serde(rename = "totalPercentUsed")]
     total_percent_used: Option<f64>,
+    #[serde(rename = "apiPercentUsed")]
+    api_percent_used: Option<f64>,
 }
 
 // Network call — cache 60s (get_rich_usage runs every few seconds on the tab).
@@ -410,25 +419,30 @@ fn fetch_cursor_rate_limits_uncached() -> (Option<RateWindow>, Option<RateWindow
         None => return (None, None),
     };
 
-    // Cursor bills monthly; approximate the window as 30 days.
+    // Cursor bills monthly; show Total (Auto+Composer+API) and API (named models).
     const MONTH_MINUTES: u64 = 30 * 24 * 60;
-    let mk = |block: Option<UsageBlock>, label: &str| -> Option<RateWindow> {
-        let b = block?;
-        let pct = b.total_percent_used.or_else(|| match (b.used, b.limit) {
+    let mk = |pct: f64, label: &str| RateWindow {
+        used_percent: pct,
+        window_minutes: MONTH_MINUTES,
+        resets_at: resets.clone(),
+        label: Some(label.to_string()),
+        is_remaining: false,
+    };
+
+    let plan = match individual.plan {
+        Some(p) => p,
+        None => return (None, None),
+    };
+    let pct_from = |field: Option<f64>| {
+        field.or_else(|| match (plan.used, plan.limit) {
             (Some(u), Some(l)) if l > 0 => Some(u as f64 / l as f64 * 100.0),
             _ => None,
-        })?;
-        Some(RateWindow {
-            used_percent: pct,
-            window_minutes: MONTH_MINUTES,
-            resets_at: resets.clone(),
-            label: Some(label.to_string()),
         })
     };
 
-    let plan = mk(individual.plan, "Plan");
-    let on_demand = mk(individual.on_demand, "On-Demand");
-    (plan, on_demand)
+    let total = pct_from(plan.total_percent_used).map(|pct| mk(pct, "Total"));
+    let api = plan.api_percent_used.map(|pct| mk(pct, "API"));
+    (total, api)
 }
 
 /// billingCycleEnd may be an ISO string or epoch millis (number or string).

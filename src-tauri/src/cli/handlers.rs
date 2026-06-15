@@ -280,6 +280,14 @@ pub fn usage(window: &str, agent_filter: Option<String>, json: bool) {
                 format_rate_window(w)
             );
         }
+        for w in &r.extra_rate_windows {
+            let name = w.label.as_deref().unwrap_or("Extra");
+            println!(
+                "      {} {}",
+                format!("{} limit:", name).dimmed(),
+                format_rate_window(w)
+            );
+        }
         if let Some(t) = &r.tokens {
             println!(
                 "      {} {} total ({} in / {} out)",
@@ -293,8 +301,9 @@ pub fn usage(window: &str, agent_filter: Option<String>, json: bool) {
 }
 
 fn format_rate_window(w: &crate::models::types::RateWindow) -> String {
+    let name = w.label.as_deref().unwrap_or("Limit");
     let label = if w.window_minutes >= 43200 {
-        format!("{}mo", w.window_minutes / 43200)
+        "monthly".to_string()
     } else if w.window_minutes >= 10080 {
         format!("{}w", w.window_minutes / 10080)
     } else if w.window_minutes >= 60 {
@@ -305,9 +314,41 @@ fn format_rate_window(w: &crate::models::types::RateWindow) -> String {
     let reset = w
         .resets_at
         .as_deref()
-        .map(|r| format!(", resets {}", r))
+        .map(|r| format!(", resets {}", format_reset_at(r)))
         .unwrap_or_default();
-    format!("{:.0}% used ({} window{})", w.used_percent, label, reset)
+    let kind = if w.is_remaining {
+        "remaining"
+    } else {
+        "used"
+    };
+    format!(
+        "{}: {:.1}% {} ({}{})",
+        name, w.used_percent, kind, label, reset
+    )
+}
+
+fn format_reset_at(iso: &str) -> String {
+    use chrono::{DateTime, Utc};
+    let normalized = iso.replace('Z', "+00:00");
+    let dt = DateTime::parse_from_rfc3339(&normalized)
+        .ok()
+        .map(|d| d.with_timezone(&Utc))
+        .or_else(|| iso.parse::<DateTime<Utc>>().ok());
+    let Some(dt) = dt else {
+        return iso.to_string();
+    };
+    let now = Utc::now();
+    let date = dt.format("%b %d, %Y").to_string();
+    if dt <= now {
+        return date;
+    }
+    let days = (dt - now).num_days();
+    if days >= 1 {
+        format!("{date} (in {days}d)")
+    } else {
+        let hours = (dt - now).num_hours().max(1);
+        format!("{date} (in {hours}h)")
+    }
 }
 
 pub fn keepalive(mode: Option<String>, status_flag: bool) {

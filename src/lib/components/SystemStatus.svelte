@@ -16,68 +16,61 @@
 </script>
 
 <div class="system-status">
-  <h2>System Status</h2>
+  <h2 class="dashboard-title">System Status</h2>
   {#if status}
     <div class="stat-grid">
       <div class="stat">
-        <span class="label">CPU</span>
-        <div class="bar-container">
+        <span class="field-label">CPU</span>
+        <div class="bar-track">
           <div
-            class="bar"
+            class="bar-fill bar"
             style="width: {Math.min(status.cpu_usage, 100)}%"
             class:high={status.cpu_usage > 80}
             class:medium={status.cpu_usage > 50 && status.cpu_usage <= 80}
           ></div>
         </div>
-        <span class="value">{status.cpu_usage.toFixed(1)}% ({status.cpu_cores} cores)</span>
+        <span class="field-value">{status.cpu_usage.toFixed(1)}% ({status.cpu_cores} cores)</span>
       </div>
 
       <div class="stat">
-        <span class="label">RAM</span>
-        <div class="bar-container">
+        <span class="field-label">RAM</span>
+        <div class="bar-track">
           <div
-            class="bar"
+            class="bar-fill bar"
             style="width: {Math.min(status.ram_usage_percent, 100)}%"
             class:high={status.ram_usage_percent > 80}
             class:medium={status.ram_usage_percent > 50 && status.ram_usage_percent <= 80}
           ></div>
         </div>
-        <span class="value">{status.ram_used_gb} / {status.ram_total_gb} GB ({status.ram_usage_percent.toFixed(1)}%)</span>
+        <span class="field-value">{status.ram_used_gb} / {status.ram_total_gb} GB ({status.ram_usage_percent.toFixed(1)}%)</span>
       </div>
 
       <div class="stat">
-        <span class="label">Uptime</span>
-        <span class="value standalone">{status.uptime_formatted}</span>
+        <span class="field-label">Uptime</span>
+        <span class="field-value standalone">{status.uptime_formatted}</span>
       </div>
 
       <div class="stat">
-        <span class="label">User</span>
-        <span class="value standalone">{status.username}</span>
+        <span class="field-label">User</span>
+        <span class="field-value standalone">{status.username}</span>
       </div>
 
       <div class="stat">
-        <span class="label">Host</span>
-        <span class="value standalone">{status.hostname}</span>
+        <span class="field-label">Host</span>
+        <span class="field-value standalone">{status.hostname}</span>
       </div>
 
       <div class="stat">
-        <span class="label">Traffic</span>
-        <span class="value standalone">↑ {formatRate(status.network_upload_rate)} &nbsp; ↓ {formatRate(status.network_download_rate)}</span>
+        <span class="field-label">Traffic</span>
+        <span class="field-value standalone">↑ {formatRate(status.network_upload_rate)} &nbsp; ↓ {formatRate(status.network_download_rate)}</span>
       </div>
     </div>
   {:else}
-    <p class="loading">Loading...</p>
+    <p class="loading-state">Loading…</p>
   {/if}
 </div>
 
 <style>
-  .system-status h2 {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-strong);
-    margin-bottom: 8px;
-  }
-
   .stat-grid {
     display: grid;
     gap: 7px;
@@ -90,25 +83,8 @@
     gap: 8px;
   }
 
-  .label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .bar-container {
-    height: 6px;
-    background: var(--surface-3);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
   .bar {
-    height: 100%;
     background: var(--ok);
-    border-radius: 3px;
-    transition: width 0.5s ease;
   }
 
   .bar.medium {
@@ -119,20 +95,12 @@
     background: var(--danger);
   }
 
-  .value {
-    font-size: 0.85rem;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-
-  .value.standalone {
+  .field-value.standalone {
     grid-column: 2 / -1;
     text-align: left;
   }
 
-  .loading {
-    color: var(--text-dim);
-    font-size: 0.9rem;
+  .field-value:not(.standalone) {
+    text-align: right;
   }
 </style>

@@ -6,6 +6,7 @@
   import AgentTab from "$lib/components/AgentTab.svelte";
   import ProxyInfo from "$lib/components/ProxyInfo.svelte";
   import KeepAlive from "$lib/components/KeepAlive.svelte";
+  import "$lib/styles/panels.css";
 
   let systemStatus = $state(null);
   let networkInfo = $state(null);
@@ -341,12 +342,18 @@
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 8px;
     margin-bottom: 8px;
+    align-items: stretch;
+  }
+
+  .grid .card {
+    margin-bottom: 0;
+    height: 100%;
   }
 
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 9px;
     padding: 12px;
     margin-bottom: 8px;
     /* Isolate each card's layout/paint so a subtree update (e.g. a poll

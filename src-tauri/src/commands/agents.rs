@@ -51,6 +51,7 @@ pub fn get_agent_rich_usage(agent: String) -> AgentUsage {
                 agent,
                 session_window: None,
                 weekly_window: None,
+                extra_rate_windows: vec![],
                 tokens: None,
                 model_breakdowns: vec![],
                 total_interactions: 0,

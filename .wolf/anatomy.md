@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-13T13:17:29.397Z
-> Files: 125 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-15T08:26:46.001Z
+> Files: 122 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../tmp/
 
@@ -10,11 +10,12 @@
 ## ./
 
 - `.gitignore` — Git ignore rules (~49 tok)
-- `CLAUDE.md` — OpenWolf (~57 tok)
+- `AGENTS.md` — Agent Hub — Agent Instructions (~121 tok)
+- `CLAUDE.md` — OpenWolf (~110 tok)
 - `HANDOFF.md` — Agent Hub — Handoff Document (~1557 tok)
 - `jsconfig.json` (~193 tok)
 - `LICENSE` (~285 tok)
-- `package-lock.json` — npm lock file (~17995 tok)
+- `package-lock.json` (~18204 tok)
 - `package.json` — Node.js package manifest (~263 tok)
 - `README.md` — Project documentation (~794 tok)
 - `svelte.config.js` — SvelteKit configuration (~137 tok)
@@ -156,6 +157,10 @@
 
 - `$types.d.ts` — Exports RequiredKeys, Snapshot, PageServerData, PageData + 6 more (~509 tok)
 
+## docs/
+
+- `STYLE.md` — Agent Hub — Product Style Guide (~2143 tok)
+
 ## packaging/homebrew/Formula/
 
 - `agent-hub-cli.rb` — CLI/TUI-only install of Agent Hub — no GUI app, no sudo, no Gatekeeper. (~358 tok)
@@ -189,12 +194,12 @@
 
 ## src-tauri/src/cli/
 
-- `handlers.rs` — status, network, agents, sessions, usage (~3145 tok)
+- `handlers.rs` — status, network, agents, sessions, usage (~3447 tok)
 - `mod.rs` — Show system status (CPU, RAM, uptime, network) (~736 tok)
 
 ## src-tauri/src/commands/
 
-- `agents.rs` — [tauri::command] (~545 tok)
+- `agents.rs` — [tauri::command] (~557 tok)
 - `keepalive.rs` — [tauri::command] (~116 tok)
 - `mod.rs` (~24 tok)
 - `network.rs` — [tauri::command] (~70 tok)
@@ -211,22 +216,22 @@
 
 ## src-tauri/src/core_modules/agents/
 
-- `claude.rs` — detect, get_sessions, get_usage, get_rich_usage (~6809 tok)
-- `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~6256 tok)
+- `claude.rs` — detect, get_sessions, get_usage, get_rich_usage (~6955 tok)
+- `codex.rs` — Candidate locations for the Codex desktop app (varies by install method). (~7449 tok)
 - `cursor_cookies.rs` — Best-effort extraction of the Cursor session cookie (~2878 tok)
-- `cursor_usage.rs` — Cursor usage + rate limits via the same approach as the `cursor-usage` CLI: (~3647 tok)
-- `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4740 tok)
+- `cursor_usage.rs` — Cursor usage + rate limits via the same approach as the `cursor-usage` CLI: (~3543 tok)
+- `cursor.rs` — detect, get_sessions, get_usage, get_rich_usage (~4806 tok)
 - `mod.rs` — Detect all agents and return their info (~410 tok)
-- `opencode.rs` — OpenCode keeps everything in one SQLite DB under the XDG data dir. (~4306 tok)
+- `opencode.rs` — OpenCode keeps everything in one SQLite DB under the XDG data dir. (~4316 tok)
 
 ## src-tauri/src/models/
 
 - `mod.rs` (~5 tok)
-- `types.rs` — System status information (~1676 tok)
+- `types.rs` — System status information (~2287 tok)
 
 ## src-tauri/src/tui/
 
-- `mod.rs` — run_tui (~14689 tok)
+- `mod.rs` — run_tui (~16785 tok)
 
 ## src/
 
@@ -235,15 +240,19 @@
 ## src/lib/components/
 
 - `AgentCard.svelte` — Svelte: AgentCard, 4 stores (~893 tok)
-- `AgentTab.svelte` — Svelte: AgentTab (~4617 tok)
-- `KeepAlive.svelte` — Svelte: KeepAlive (~1046 tok)
-- `NetworkInfo.svelte` — Svelte: NetworkInfo (~455 tok)
-- `ProxyInfo.svelte` — Svelte: ProxyInfo (~3564 tok)
+- `AgentTab.svelte` — Svelte: AgentTab (~5939 tok)
+- `KeepAlive.svelte` — Svelte: KeepAlive (~1019 tok)
+- `NetworkInfo.svelte` — Svelte: NetworkInfo (~349 tok)
+- `ProxyInfo.svelte` — Svelte: ProxyInfo (~3407 tok)
 - `SessionList.svelte` — Svelte: SessionList, 1 stores (~965 tok)
-- `SystemStatus.svelte` — Svelte: SystemStatus (~930 tok)
+- `SystemStatus.svelte` — Svelte: SystemStatus (~805 tok)
 - `UsageChart.svelte` — Svelte: UsageChart, 2 stores (~492 tok)
+
+## src/lib/styles/
+
+- `panels.css` — Stylesheet (~447 tok)
 
 ## src/routes/
 
 - `+layout.js` — Tauri doesn't have a Node.js server to do proper SSR (~83 tok)
-- `+page.svelte` — Svelte: +page (~2967 tok)
+- `+page.svelte` — Svelte: +page (~2999 tok)

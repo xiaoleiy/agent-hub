@@ -5,11 +5,12 @@ use crate::models::types::{
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 /// Candidate locations for the Codex desktop app (varies by install method).
 fn codex_app_candidates() -> Vec<PathBuf> {
@@ -324,8 +325,17 @@ pub fn get_rich_usage() -> AgentUsage {
         }
     }
 
-    // Aggregate token usage + most-recent rate limits across all session files.
+    // Live rate limits from the OAuth usage API; jsonl session logs are often stale
+    // when Codex is not actively writing token_count events.
+    let (session_window, weekly_window) = fetch_codex_rate_limits();
     let agg = aggregate_codex_sessions(&sessions_dir);
+    let (session_window, weekly_window) = match (session_window, weekly_window) {
+        (Some(s), Some(w)) => (Some(s), Some(w)),
+        (s, w) => (
+            s.or_else(|| agg.primary.map(RateSnapshot::into_window)),
+            w.or_else(|| agg.secondary.map(RateSnapshot::into_window)),
+        ),
+    };
 
     let tokens = TokenUsage {
         input_tokens: agg.input,
@@ -351,8 +361,9 @@ pub fn get_rich_usage() -> AgentUsage {
 
     AgentUsage {
         agent: "Codex".to_string(),
-        session_window: agg.primary.map(RateSnapshot::into_window),
-        weekly_window: agg.secondary.map(RateSnapshot::into_window),
+        session_window,
+        weekly_window,
+        extra_rate_windows: vec![],
         tokens: if has_tokens { Some(tokens) } else { None },
         model_breakdowns,
         total_interactions: 0, // Not meaningful for Codex
@@ -378,6 +389,7 @@ impl RateSnapshot {
                 .and_then(|s| DateTime::from_timestamp(s, 0))
                 .map(|d| d.to_rfc3339()),
             label: None,
+            is_remaining: false,
         }
     }
 }
@@ -570,6 +582,105 @@ fn parse_rate(v: &serde_json::Value, default_minutes: u64) -> RateSnapshotData {
     }
 }
 
+fn codex_oauth_token() -> Option<String> {
+    let data = fs::read_to_string(codex_dir().join("auth.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&data).ok()?;
+    v.pointer("/tokens/access_token")
+        .and_then(|x| x.as_str())
+        .map(str::to_string)
+}
+
+#[derive(Deserialize)]
+struct CodexWhamUsageResp {
+    rate_limit: Option<CodexWhamRateLimit>,
+}
+
+#[derive(Deserialize)]
+struct CodexWhamRateLimit {
+    primary_window: Option<CodexWhamWindow>,
+    secondary_window: Option<CodexWhamWindow>,
+}
+
+#[derive(Deserialize)]
+struct CodexWhamWindow {
+    used_percent: f64,
+    limit_window_seconds: u64,
+    reset_at: i64,
+}
+
+/// OAuth `used_percent` is consumed quota; the Codex app shows remaining (100 − used).
+fn wham_window_to_rate(w: &CodexWhamWindow, label: &str) -> RateWindow {
+    RateWindow {
+        used_percent: (100.0 - w.used_percent).clamp(0.0, 100.0),
+        window_minutes: w.limit_window_seconds / 60,
+        resets_at: DateTime::from_timestamp(w.reset_at, 0).map(|d| d.to_rfc3339()),
+        label: Some(label.to_string()),
+        is_remaining: true,
+    }
+}
+
+type CodexRateLimitCache = Option<(Instant, Option<RateWindow>, Option<RateWindow>)>;
+static CODEX_RL_CACHE: Mutex<CodexRateLimitCache> = Mutex::new(None);
+
+/// (session_window, weekly_window) from `GET /backend-api/wham/usage`. Cached 60s.
+fn fetch_codex_rate_limits() -> (Option<RateWindow>, Option<RateWindow>) {
+    if let Ok(guard) = CODEX_RL_CACHE.lock() {
+        if let Some((t, s, w)) = guard.as_ref() {
+            if t.elapsed() < Duration::from_secs(60) {
+                return (s.clone(), w.clone());
+            }
+        }
+    }
+    let result = fetch_codex_rate_limits_uncached();
+    if let Ok(mut guard) = CODEX_RL_CACHE.lock() {
+        *guard = Some((Instant::now(), result.0.clone(), result.1.clone()));
+    }
+    result
+}
+
+fn fetch_codex_rate_limits_uncached() -> (Option<RateWindow>, Option<RateWindow>) {
+    let token = match codex_oauth_token() {
+        Some(t) => t,
+        None => return (None, None),
+    };
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(_) => return (None, None),
+    };
+    let resp: Option<CodexWhamUsageResp> = rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .ok()?;
+        let r = client
+            .get("https://chatgpt.com/backend-api/wham/usage")
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .ok()?;
+        if !r.status().is_success() {
+            return None;
+        }
+        r.json::<CodexWhamUsageResp>().await.ok()
+    });
+
+    let rl = match resp.and_then(|r| r.rate_limit) {
+        Some(rl) => rl,
+        None => return (None, None),
+    };
+
+    let session = rl
+        .primary_window
+        .as_ref()
+        .map(|w| wham_window_to_rate(w, "5h"));
+    let weekly = rl
+        .secondary_window
+        .as_ref()
+        .map(|w| wham_window_to_rate(w, "Weekly"));
+
+    (session, weekly)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -671,6 +782,33 @@ mod tests {
         // Query to check if source column exists
         let result = conn.prepare("SELECT source FROM threads LIMIT 1");
         assert!(result.is_ok(), "threads table should have 'source' column");
+    }
+
+    #[test]
+    fn wham_window_converts_used_to_remaining() {
+        let w = CodexWhamWindow {
+            used_percent: 2.0,
+            limit_window_seconds: 18_000,
+            reset_at: 1_781_522_839,
+        };
+        let rate = wham_window_to_rate(&w, "5h");
+        assert!((rate.used_percent - 98.0).abs() < f64::EPSILON);
+        assert!(rate.is_remaining);
+        assert_eq!(rate.window_minutes, 300);
+        assert_eq!(rate.label.as_deref(), Some("5h"));
+    }
+
+    #[test]
+    fn wham_secondary_window_converts_used_to_remaining() {
+        let w = CodexWhamWindow {
+            used_percent: 35.0,
+            limit_window_seconds: 604_800,
+            reset_at: 1_781_917_415,
+        };
+        let rate = wham_window_to_rate(&w, "Weekly");
+        assert!((rate.used_percent - 65.0).abs() < f64::EPSILON);
+        assert!(rate.is_remaining);
+        assert_eq!(rate.window_minutes, 10_080);
     }
 
     #[test]
